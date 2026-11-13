@@ -1,0 +1,42 @@
+# Raw data and local data artifacts (never commit raw data; only data/sample/ and data/manifest.csv)
+data/raw/
+data/interim/
+data/processed/
+*.zip
+*.parquet
+
+# Python virtual environments & caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# dbt artifacts
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+logs/
+
+# Secrets, environment variables, and GCP credentials
+.env
+.env.*
+*credentials*.json
+*service-account*.json
+*service_account*.json
+gcloud-key*.json
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
