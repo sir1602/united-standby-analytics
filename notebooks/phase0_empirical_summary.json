@@ -1,0 +1,1095 @@
+{
+  "otp": {
+    "months_count": 56,
+    "date_min": "2019-01",
+    "date_max": "2026-08",
+    "total_us_raw_rows": 35881885,
+    "total_ord_all_rows": 1637491,
+    "total_ord_ua_rows": 830941,
+    "total_performed": 814847,
+    "total_cancelled": 16094,
+    "total_diverted": 2390,
+    "by_year": {
+      "2019": {
+        "months": 12,
+        "us_raw_rows": 8091684,
+        "ord_ua_rows": 199882,
+        "performed": 194127,
+        "cancelled": 5755,
+        "carriers": {
+          "UA": 77660,
+          "ZW": 38321,
+          "OO": 34022,
+          "YX": 13697,
+          "EV": 13073,
+          "AX": 12774,
+          "G7": 10247,
+          "C5": 88
+        }
+      },
+      "2023": {
+        "months": 12,
+        "us_raw_rows": 7278739,
+        "ord_ua_rows": 151447,
+        "performed": 149486,
+        "cancelled": 1961,
+        "carriers": {
+          "UA": 84539,
+          "OO": 43274,
+          "ZW": 8464,
+          "YX": 8451,
+          "G7": 6719
+        }
+      },
+      "2024": {
+        "months": 12,
+        "us_raw_rows": 7546968,
+        "ord_ua_rows": 161074,
+        "performed": 158869,
+        "cancelled": 2205,
+        "carriers": {
+          "UA": 89830,
+          "OO": 48968,
+          "YX": 11748,
+          "G7": 10528
+        }
+      },
+      "2025": {
+        "months": 12,
+        "us_raw_rows": 7736770,
+        "ord_ua_rows": 181927,
+        "performed": 179482,
+        "cancelled": 2445,
+        "carriers": {
+          "UA": 95572,
+          "OO": 49664,
+          "G7": 20849,
+          "YX": 15842
+        }
+      },
+      "2026": {
+        "months": 8,
+        "us_raw_rows": 5227724,
+        "ord_ua_rows": 136611,
+        "performed": 132883,
+        "cancelled": 3728,
+        "carriers": {
+          "UA": 69007,
+          "OO": 39150,
+          "G7": 17894,
+          "YX": 10560
+        }
+      }
+    },
+    "null_overall": {
+      "FlightDate": 0,
+      "Marketing_Airline_Network": 0,
+      "Operating_Airline": 0,
+      "Origin": 0,
+      "Dest": 0,
+      "CRSDepTime": 0,
+      "Tail_Number": 8222,
+      "DepTime": 15275,
+      "DepDelay": 15486,
+      "ArrTime": 16449,
+      "ArrDelay": 18483,
+      "ActualElapsedTime": 18483,
+      "CancellationCode": 814847
+    },
+    "null_on_performed": {
+      "FlightDate": 0,
+      "Marketing_Airline_Network": 0,
+      "Operating_Airline": 0,
+      "Origin": 0,
+      "Dest": 0,
+      "CRSDepTime": 0,
+      "Tail_Number": 0,
+      "DepTime": 0,
+      "DepDelay": 0,
+      "ArrTime": 355,
+      "ArrDelay": 2389,
+      "ActualElapsedTime": 2389,
+      "CancellationCode": 814847
+    },
+    "null_on_cancelled": {
+      "FlightDate": 0,
+      "Marketing_Airline_Network": 0,
+      "Operating_Airline": 0,
+      "Origin": 0,
+      "Dest": 0,
+      "CRSDepTime": 0,
+      "Tail_Number": 8222,
+      "DepTime": 15275,
+      "DepDelay": 15486,
+      "ArrTime": 16094,
+      "ArrDelay": 16094,
+      "ActualElapsedTime": 16094,
+      "CancellationCode": 0
+    },
+    "null_on_diverted": {
+      "FlightDate": 0,
+      "Marketing_Airline_Network": 0,
+      "Operating_Airline": 0,
+      "Origin": 0,
+      "Dest": 0,
+      "CRSDepTime": 0,
+      "Tail_Number": 0,
+      "DepTime": 0,
+      "DepDelay": 0,
+      "ArrTime": 355,
+      "ArrDelay": 2389,
+      "ActualElapsedTime": 2389,
+      "CancellationCode": 2390
+    }
+  },
+  "t100": {
+    "total_raw_rows": 2520139,
+    "col_count": 50,
+    "total_ord_class_f_rows": 75863,
+    "total_ord_class_f_dom_rows": 65786,
+    "total_ord_class_f_intl_rows": 10077,
+    "null_counts_ord_f": {},
+    "by_year": {
+      "2019": {
+        "raw_rows": 487923,
+        "ord_class_f_rows": 16117,
+        "ord_class_f_dom_rows": 14068,
+        "ord_class_f_intl_rows": 2049,
+        "months_available": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "ua_system_deps": 795002,
+        "ua_system_seats": 138567871,
+        "ua_system_pax": 116626076,
+        "ua_system_lf_pct": 84.17
+      },
+      "2023": {
+        "raw_rows": 529562,
+        "ord_class_f_rows": 14709,
+        "ord_class_f_dom_rows": 12782,
+        "ord_class_f_intl_rows": 1927,
+        "months_available": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "ua_system_deps": 909307,
+        "ua_system_seats": 160218153,
+        "ua_system_pax": 134394576,
+        "ua_system_lf_pct": 83.88
+      },
+      "2024": {
+        "raw_rows": 549799,
+        "ord_class_f_rows": 15901,
+        "ord_class_f_dom_rows": 13789,
+        "ord_class_f_intl_rows": 2112,
+        "months_available": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "ua_system_deps": 962352,
+        "ua_system_seats": 169518510,
+        "ua_system_pax": 140993783,
+        "ua_system_lf_pct": 83.17
+      },
+      "2025": {
+        "raw_rows": 571262,
+        "ord_class_f_rows": 17395,
+        "ord_class_f_dom_rows": 15038,
+        "ord_class_f_intl_rows": 2357,
+        "months_available": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12
+        ],
+        "ua_system_deps": 1012639,
+        "ua_system_seats": 179418829,
+        "ua_system_pax": 146214658,
+        "ua_system_lf_pct": 81.49
+      },
+      "2026": {
+        "raw_rows": 381593,
+        "ord_class_f_rows": 11741,
+        "ord_class_f_dom_rows": 10109,
+        "ord_class_f_intl_rows": 1632,
+        "months_available": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "ua_system_deps": 702251,
+        "ua_system_seats": 124850953,
+        "ua_system_pax": 102192385,
+        "ua_system_lf_pct": 81.85
+      }
+    }
+  },
+  "reconciliation": [
+    {
+      "year": 2019,
+      "op_carrier": "UA",
+      "otp_scheduled": 77660,
+      "otp_performed": 76855,
+      "t100_matched_route_deps": 76987,
+      "t100_total_ord_dom_deps": 77019,
+      "t100_total_ord_intl_deps": 10939,
+      "matched_diff_pct": 0.17,
+      "matched_route_months": 896,
+      "within_10pct_route_months": 884,
+      "within_10pct_rate": 98.7,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "ZW",
+      "otp_scheduled": 38321,
+      "otp_performed": 36811,
+      "t100_matched_route_deps": 36751,
+      "t100_total_ord_dom_deps": 36767,
+      "t100_total_ord_intl_deps": 0,
+      "matched_diff_pct": -0.16,
+      "matched_route_months": 821,
+      "within_10pct_route_months": 808,
+      "within_10pct_rate": 98.4,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "OO",
+      "otp_scheduled": 34022,
+      "otp_performed": 32691,
+      "t100_matched_route_deps": 54874,
+      "t100_total_ord_dom_deps": 62168,
+      "t100_total_ord_intl_deps": 4344,
+      "matched_diff_pct": 67.86,
+      "matched_route_months": 1088,
+      "within_10pct_route_months": 680,
+      "within_10pct_rate": 62.5,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "YX",
+      "otp_scheduled": 13697,
+      "otp_performed": 13221,
+      "t100_matched_route_deps": 13133,
+      "t100_total_ord_dom_deps": 13555,
+      "t100_total_ord_intl_deps": 407,
+      "matched_diff_pct": -0.67,
+      "matched_route_months": 530,
+      "within_10pct_route_months": 515,
+      "within_10pct_rate": 97.2,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "EV",
+      "otp_scheduled": 13073,
+      "otp_performed": 12408,
+      "t100_matched_route_deps": 12482,
+      "t100_total_ord_dom_deps": 12562,
+      "t100_total_ord_intl_deps": 1646,
+      "matched_diff_pct": 0.6,
+      "matched_route_months": 620,
+      "within_10pct_route_months": 600,
+      "within_10pct_rate": 96.8,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "AX",
+      "otp_scheduled": 12774,
+      "otp_performed": 12138,
+      "t100_matched_route_deps": 12135,
+      "t100_total_ord_dom_deps": 12143,
+      "t100_total_ord_intl_deps": 209,
+      "matched_diff_pct": -0.02,
+      "matched_route_months": 449,
+      "within_10pct_route_months": 446,
+      "within_10pct_rate": 99.3,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "G7",
+      "otp_scheduled": 10247,
+      "otp_performed": 9918,
+      "t100_matched_route_deps": 10404,
+      "t100_total_ord_dom_deps": 10485,
+      "t100_total_ord_intl_deps": 296,
+      "matched_diff_pct": 4.9,
+      "matched_route_months": 454,
+      "within_10pct_route_months": 443,
+      "within_10pct_rate": 97.6,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2019,
+      "op_carrier": "C5",
+      "otp_scheduled": 88,
+      "otp_performed": 85,
+      "t100_matched_route_deps": 85,
+      "t100_total_ord_dom_deps": 86,
+      "t100_total_ord_intl_deps": 0,
+      "matched_diff_pct": 0.0,
+      "matched_route_months": 8,
+      "within_10pct_route_months": 8,
+      "within_10pct_rate": 100.0,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2023,
+      "op_carrier": "UA",
+      "otp_scheduled": 84539,
+      "otp_performed": 83560,
+      "t100_matched_route_deps": 83679,
+      "t100_total_ord_dom_deps": 83698,
+      "t100_total_ord_intl_deps": 10051,
+      "matched_diff_pct": 0.14,
+      "matched_route_months": 1017,
+      "within_10pct_route_months": 1013,
+      "within_10pct_rate": 99.6,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2023,
+      "op_carrier": "OO",
+      "otp_scheduled": 43274,
+      "otp_performed": 42644,
+      "t100_matched_route_deps": 47710,
+      "t100_total_ord_dom_deps": 50723,
+      "t100_total_ord_intl_deps": 2232,
+      "matched_diff_pct": 11.88,
+      "matched_route_months": 942,
+      "within_10pct_route_months": 758,
+      "within_10pct_rate": 80.5,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2023,
+      "op_carrier": "ZW",
+      "otp_scheduled": 8464,
+      "otp_performed": 8290,
+      "t100_matched_route_deps": 9918,
+      "t100_total_ord_dom_deps": 25319,
+      "t100_total_ord_intl_deps": 1294,
+      "matched_diff_pct": 19.64,
+      "matched_route_months": 238,
+      "within_10pct_route_months": 206,
+      "within_10pct_rate": 86.6,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2023,
+      "op_carrier": "YX",
+      "otp_scheduled": 8451,
+      "otp_performed": 8329,
+      "t100_matched_route_deps": 11216,
+      "t100_total_ord_dom_deps": 13813,
+      "t100_total_ord_intl_deps": 657,
+      "matched_diff_pct": 34.66,
+      "matched_route_months": 364,
+      "within_10pct_route_months": 234,
+      "within_10pct_rate": 64.3,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2023,
+      "op_carrier": "G7",
+      "otp_scheduled": 6719,
+      "otp_performed": 6663,
+      "t100_matched_route_deps": 6661,
+      "t100_total_ord_dom_deps": 6669,
+      "t100_total_ord_intl_deps": 230,
+      "matched_diff_pct": -0.03,
+      "matched_route_months": 269,
+      "within_10pct_route_months": 268,
+      "within_10pct_rate": 99.6,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2024,
+      "op_carrier": "UA",
+      "otp_scheduled": 89830,
+      "otp_performed": 88643,
+      "t100_matched_route_deps": 88801,
+      "t100_total_ord_dom_deps": 88830,
+      "t100_total_ord_intl_deps": 11258,
+      "matched_diff_pct": 0.18,
+      "matched_route_months": 1023,
+      "within_10pct_route_months": 1020,
+      "within_10pct_rate": 99.7,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2024,
+      "op_carrier": "OO",
+      "otp_scheduled": 48968,
+      "otp_performed": 48138,
+      "t100_matched_route_deps": 51754,
+      "t100_total_ord_dom_deps": 54102,
+      "t100_total_ord_intl_deps": 1600,
+      "matched_diff_pct": 7.51,
+      "matched_route_months": 997,
+      "within_10pct_route_months": 871,
+      "within_10pct_rate": 87.4,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2024,
+      "op_carrier": "YX",
+      "otp_scheduled": 11748,
+      "otp_performed": 11661,
+      "t100_matched_route_deps": 14843,
+      "t100_total_ord_dom_deps": 17012,
+      "t100_total_ord_intl_deps": 2374,
+      "matched_diff_pct": 27.29,
+      "matched_route_months": 431,
+      "within_10pct_route_months": 296,
+      "within_10pct_rate": 68.7,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2024,
+      "op_carrier": "G7",
+      "otp_scheduled": 10528,
+      "otp_performed": 10427,
+      "t100_matched_route_deps": 10428,
+      "t100_total_ord_dom_deps": 10434,
+      "t100_total_ord_intl_deps": 49,
+      "matched_diff_pct": 0.01,
+      "matched_route_months": 337,
+      "within_10pct_route_months": 330,
+      "within_10pct_rate": 97.9,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2025,
+      "op_carrier": "UA",
+      "otp_scheduled": 95572,
+      "otp_performed": 94852,
+      "t100_matched_route_deps": 94977,
+      "t100_total_ord_dom_deps": 95010,
+      "t100_total_ord_intl_deps": 11182,
+      "matched_diff_pct": 0.13,
+      "matched_route_months": 1034,
+      "within_10pct_route_months": 1032,
+      "within_10pct_rate": 99.8,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2025,
+      "op_carrier": "OO",
+      "otp_scheduled": 49664,
+      "otp_performed": 48588,
+      "t100_matched_route_deps": 62340,
+      "t100_total_ord_dom_deps": 66834,
+      "t100_total_ord_intl_deps": 1481,
+      "matched_diff_pct": 28.3,
+      "matched_route_months": 1022,
+      "within_10pct_route_months": 746,
+      "within_10pct_rate": 73.0,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2025,
+      "op_carrier": "G7",
+      "otp_scheduled": 20849,
+      "otp_performed": 20481,
+      "t100_matched_route_deps": 20474,
+      "t100_total_ord_dom_deps": 20483,
+      "t100_total_ord_intl_deps": 232,
+      "matched_diff_pct": -0.03,
+      "matched_route_months": 438,
+      "within_10pct_route_months": 437,
+      "within_10pct_rate": 99.8,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2025,
+      "op_carrier": "YX",
+      "otp_scheduled": 15842,
+      "otp_performed": 15561,
+      "t100_matched_route_deps": 24088,
+      "t100_total_ord_dom_deps": 29125,
+      "t100_total_ord_intl_deps": 3237,
+      "matched_diff_pct": 54.8,
+      "matched_route_months": 481,
+      "within_10pct_route_months": 246,
+      "within_10pct_rate": 51.1,
+      "median_route_diff_pct": 8.33
+    },
+    {
+      "year": 2026,
+      "op_carrier": "UA",
+      "otp_scheduled": 69007,
+      "otp_performed": 67906,
+      "t100_matched_route_deps": 68041,
+      "t100_total_ord_dom_deps": 68062,
+      "t100_total_ord_intl_deps": 8243,
+      "matched_diff_pct": 0.2,
+      "matched_route_months": 720,
+      "within_10pct_route_months": 717,
+      "within_10pct_rate": 99.6,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2026,
+      "op_carrier": "OO",
+      "otp_scheduled": 39150,
+      "otp_performed": 37525,
+      "t100_matched_route_deps": 49667,
+      "t100_total_ord_dom_deps": 53273,
+      "t100_total_ord_intl_deps": 1132,
+      "matched_diff_pct": 32.36,
+      "matched_route_months": 775,
+      "within_10pct_route_months": 517,
+      "within_10pct_rate": 66.7,
+      "median_route_diff_pct": 1.31
+    },
+    {
+      "year": 2026,
+      "op_carrier": "G7",
+      "otp_scheduled": 17894,
+      "otp_performed": 17255,
+      "t100_matched_route_deps": 17250,
+      "t100_total_ord_dom_deps": 17259,
+      "t100_total_ord_intl_deps": 45,
+      "matched_diff_pct": -0.03,
+      "matched_route_months": 328,
+      "within_10pct_route_months": 325,
+      "within_10pct_rate": 99.1,
+      "median_route_diff_pct": 0.0
+    },
+    {
+      "year": 2026,
+      "op_carrier": "YX",
+      "otp_scheduled": 10560,
+      "otp_performed": 10197,
+      "t100_matched_route_deps": 16946,
+      "t100_total_ord_dom_deps": 21964,
+      "t100_total_ord_intl_deps": 1948,
+      "matched_diff_pct": 66.19,
+      "matched_route_months": 305,
+      "within_10pct_route_months": 124,
+      "within_10pct_rate": 40.7,
+      "median_route_diff_pct": 26.09
+    }
+  ],
+  "faa_matching": {
+    "overall": {
+      "non_null_tail": 822719,
+      "matched_master": 788180,
+      "matched_master_pct": 95.8,
+      "matched_dereg": 21206,
+      "matched_dereg_pct": 2.58,
+      "combined_matched": 809386,
+      "combined_matched_pct": 98.38,
+      "unmatched": 13333,
+      "unmatched_pct": 1.62,
+      "unique_unmatched_tails": 44,
+      "total_flights": 830941,
+      "performed_flights": 814847
+    },
+    "by_year": {
+      "2019": {
+        "non_null_tail": 196680,
+        "matched_master": 168661,
+        "matched_master_pct": 85.75,
+        "matched_dereg": 16644,
+        "matched_dereg_pct": 8.46,
+        "combined_matched": 185305,
+        "combined_matched_pct": 94.22,
+        "unmatched": 11375,
+        "unmatched_pct": 5.78,
+        "unique_unmatched_tails": 43
+      },
+      "2023": {
+        "non_null_tail": 150278,
+        "matched_master": 145917,
+        "matched_master_pct": 97.1,
+        "matched_dereg": 2545,
+        "matched_dereg_pct": 1.69,
+        "combined_matched": 148462,
+        "combined_matched_pct": 98.79,
+        "unmatched": 1816,
+        "unmatched_pct": 1.21,
+        "unique_unmatched_tails": 14
+      },
+      "2024": {
+        "non_null_tail": 159842,
+        "matched_master": 157959,
+        "matched_master_pct": 98.82,
+        "matched_dereg": 1742,
+        "matched_dereg_pct": 1.09,
+        "combined_matched": 159701,
+        "combined_matched_pct": 99.91,
+        "unmatched": 141,
+        "unmatched_pct": 0.09,
+        "unique_unmatched_tails": 2
+      },
+      "2025": {
+        "non_null_tail": 180924,
+        "matched_master": 180648,
+        "matched_master_pct": 99.85,
+        "matched_dereg": 275,
+        "matched_dereg_pct": 0.15,
+        "combined_matched": 180923,
+        "combined_matched_pct": 100.0,
+        "unmatched": 1,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 1
+      },
+      "2026": {
+        "non_null_tail": 134995,
+        "matched_master": 134995,
+        "matched_master_pct": 100.0,
+        "matched_dereg": 0,
+        "matched_dereg_pct": 0.0,
+        "combined_matched": 134995,
+        "combined_matched_pct": 100.0,
+        "unmatched": 0,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 0
+      }
+    },
+    "by_carrier": {
+      "UA": {
+        "non_null_tail": 412093,
+        "matched_master": 404859,
+        "matched_master_pct": 98.24,
+        "matched_dereg": 7234,
+        "matched_dereg_pct": 1.76,
+        "combined_matched": 412093,
+        "combined_matched_pct": 100.0,
+        "unmatched": 0,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 0
+      },
+      "OO": {
+        "non_null_tail": 215077,
+        "matched_master": 211731,
+        "matched_master_pct": 98.44,
+        "matched_dereg": 3345,
+        "matched_dereg_pct": 1.56,
+        "combined_matched": 215076,
+        "combined_matched_pct": 100.0,
+        "unmatched": 1,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 1
+      },
+      "G7": {
+        "non_null_tail": 64806,
+        "matched_master": 57601,
+        "matched_master_pct": 88.88,
+        "matched_dereg": 232,
+        "matched_dereg_pct": 0.36,
+        "combined_matched": 57833,
+        "combined_matched_pct": 89.24,
+        "unmatched": 6973,
+        "unmatched_pct": 10.76,
+        "unique_unmatched_tails": 23
+      },
+      "YX": {
+        "non_null_tail": 60279,
+        "matched_master": 54711,
+        "matched_master_pct": 90.76,
+        "matched_dereg": 0,
+        "matched_dereg_pct": 0.0,
+        "combined_matched": 54711,
+        "combined_matched_pct": 90.76,
+        "unmatched": 5568,
+        "unmatched_pct": 9.24,
+        "unique_unmatched_tails": 18
+      },
+      "ZW": {
+        "non_null_tail": 45158,
+        "matched_master": 43897,
+        "matched_master_pct": 97.21,
+        "matched_dereg": 566,
+        "matched_dereg_pct": 1.25,
+        "combined_matched": 44463,
+        "combined_matched_pct": 98.46,
+        "unmatched": 695,
+        "unmatched_pct": 1.54,
+        "unique_unmatched_tails": 1
+      },
+      "EV": {
+        "non_null_tail": 13069,
+        "matched_master": 7131,
+        "matched_master_pct": 54.56,
+        "matched_dereg": 5842,
+        "matched_dereg_pct": 44.7,
+        "combined_matched": 12973,
+        "combined_matched_pct": 99.27,
+        "unmatched": 96,
+        "unmatched_pct": 0.73,
+        "unique_unmatched_tails": 1
+      },
+      "AX": {
+        "non_null_tail": 12152,
+        "matched_master": 8165,
+        "matched_master_pct": 67.19,
+        "matched_dereg": 3987,
+        "matched_dereg_pct": 32.81,
+        "combined_matched": 12152,
+        "combined_matched_pct": 100.0,
+        "unmatched": 0,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 0
+      },
+      "C5": {
+        "non_null_tail": 85,
+        "matched_master": 85,
+        "matched_master_pct": 100.0,
+        "matched_dereg": 0,
+        "matched_dereg_pct": 0.0,
+        "combined_matched": 85,
+        "combined_matched_pct": 100.0,
+        "unmatched": 0,
+        "unmatched_pct": 0.0,
+        "unique_unmatched_tails": 0
+      }
+    }
+  },
+  "faa": {
+    "MASTER.txt": {
+      "rows": 319135,
+      "raw_col_count": 35,
+      "clean_col_count": 34,
+      "has_bom": true,
+      "columns": [
+        "N-NUMBER",
+        "SERIAL NUMBER",
+        "MFR MDL CODE",
+        "ENG MFR MDL",
+        "YEAR MFR",
+        "TYPE REGISTRANT",
+        "NAME",
+        "STREET",
+        "STREET2",
+        "CITY"
+      ]
+    },
+    "DEREG.txt": {
+      "rows": 383757,
+      "raw_col_count": 39,
+      "clean_col_count": 38,
+      "has_bom": true,
+      "columns": [
+        "N-NUMBER",
+        "SERIAL-NUMBER",
+        "MFR-MDL-CODE",
+        "STATUS-CODE",
+        "NAME",
+        "STREET-MAIL",
+        "STREET2-MAIL",
+        "CITY-MAIL",
+        "STATE-ABBREV-MAIL",
+        "ZIP-CODE-MAIL"
+      ]
+    },
+    "ACFTREF.txt": {
+      "rows": 94210,
+      "raw_col_count": 14,
+      "clean_col_count": 13,
+      "has_bom": true,
+      "columns": [
+        "CODE",
+        "MFR",
+        "MODEL",
+        "TYPE-ACFT",
+        "TYPE-ENG",
+        "AC-CAT",
+        "BUILD-CERT-IND",
+        "NO-ENG",
+        "NO-SEATS",
+        "AC-WEIGHT"
+      ]
+    }
+  },
+  "quirks": {
+    "quirk_1_leading_zero_hhmm": {
+      "CRSDepTime": 201918,
+      "DepTime": 198584,
+      "CRSArrTime": 60363,
+      "ArrTime": 84082
+    },
+    "quirk_1_hour_blocks": {
+      "early (05-08)": 89575,
+      "evening (17-20)": 172936,
+      "late (20-05)": 90011,
+      "morning (08-11)": 185729,
+      "afternoon (14-17)": 159868,
+      "midday (11-14)": 132822
+    },
+    "quirk_2_2400_counts": {
+      "ArrTime": 121,
+      "DepTime": 7,
+      "CRSArrTime": 1
+    },
+    "quirk_2_2400_examples": [
+      {
+        "FlightDate": "2019-01-28",
+        "Operating_Airline": "OO",
+        "Flight_Number": "5602",
+        "Origin": "ORD",
+        "Dest": "BNA",
+        "Tail_Number": "N204SY",
+        "Column": "ArrTime",
+        "CRSDepTime": "1950",
+        "DepTime": "2121",
+        "CRSArrTime": "2129",
+        "ArrTime": "2400"
+      },
+      {
+        "FlightDate": "2019-01-24",
+        "Operating_Airline": "OO",
+        "Flight_Number": "5049",
+        "Origin": "ORD",
+        "Dest": "FWA",
+        "Tail_Number": "N904EV",
+        "Column": "DepTime",
+        "CRSDepTime": "2105",
+        "DepTime": "2400",
+        "CRSArrTime": "2316",
+        "ArrTime": "0158"
+      },
+      {
+        "FlightDate": "2019-01-15",
+        "Operating_Airline": "YX",
+        "Flight_Number": "3561",
+        "Origin": "ORD",
+        "Dest": "CVG",
+        "Tail_Number": "N637RW",
+        "Column": "ArrTime",
+        "CRSDepTime": "2130",
+        "DepTime": "2151",
+        "CRSArrTime": "2347",
+        "ArrTime": "2400"
+      },
+      {
+        "FlightDate": "2019-01-25",
+        "Operating_Airline": "EV",
+        "Flight_Number": "4263",
+        "Origin": "ORD",
+        "Dest": "LIT",
+        "Tail_Number": "N11548",
+        "Column": "ArrTime",
+        "CRSDepTime": "1950",
+        "DepTime": "2158",
+        "CRSArrTime": "2155",
+        "ArrTime": "2400"
+      }
+    ],
+    "quirk_4_orig_id_map": {
+      "13930": [
+        "ORD"
+      ]
+    },
+    "quirk_4_dest_count": 191,
+    "quirk_4_dest_multi_id": {},
+    "quirk_5_multi_acft_by_year": {
+      "2019": {
+        "ua_family_route_months": 5253,
+        "ua_family_multi_acft": 2178,
+        "ua_family_multi_pct": 41.46,
+        "ua_mainline_route_months": 925,
+        "ua_mainline_multi_acft": 803,
+        "ua_mainline_multi_pct": 86.81
+      },
+      "2023": {
+        "ua_family_route_months": 3553,
+        "ua_family_multi_acft": 1661,
+        "ua_family_multi_pct": 46.75,
+        "ua_mainline_route_months": 1035,
+        "ua_mainline_multi_acft": 930,
+        "ua_mainline_multi_pct": 89.86
+      },
+      "2024": {
+        "ua_family_route_months": 3624,
+        "ua_family_multi_acft": 1683,
+        "ua_family_multi_pct": 46.44,
+        "ua_mainline_route_months": 1047,
+        "ua_mainline_multi_acft": 942,
+        "ua_mainline_multi_pct": 89.97
+      },
+      "2025": {
+        "ua_family_route_months": 3589,
+        "ua_family_multi_acft": 1873,
+        "ua_family_multi_pct": 52.19,
+        "ua_mainline_route_months": 1064,
+        "ua_mainline_multi_acft": 940,
+        "ua_mainline_multi_pct": 88.35
+      },
+      "2026": {
+        "ua_family_route_months": 2553,
+        "ua_family_multi_acft": 1179,
+        "ua_family_multi_pct": 46.18,
+        "ua_mainline_route_months": 739,
+        "ua_mainline_multi_acft": 639,
+        "ua_mainline_multi_pct": 86.47
+      }
+    },
+    "quirk_5_overall_ua_family_multi_acft": 8574,
+    "quirk_5_overall_ua_family_route_months": 18572,
+    "quirk_5_overall_ua_family_multi_pct": 46.17,
+    "quirk_5_max_example": {
+      "year": 2023,
+      "month": 7,
+      "carrier": "UA",
+      "dest": "EWR",
+      "num_acft_types": 14,
+      "acft_types": [
+        "612",
+        "614",
+        "622",
+        "623",
+        "624",
+        "626",
+        "627",
+        "637",
+        "694",
+        "698",
+        "838",
+        "839",
+        "888",
+        "889"
+      ],
+      "deps_perf": 296
+    }
+  },
+  "tsa": {
+    "total_days": 1777,
+    "date_min": "2019-01-01",
+    "date_max": "2026-11-12",
+    "by_year": {
+      "2019": {
+        "days": 365,
+        "min_date": "2019-01-01",
+        "max_date": "2019-12-31",
+        "mean_throughput": 2323567,
+        "median_throughput": 2367915,
+        "min_throughput": 1591158,
+        "min_throughput_date": "2019-11-28",
+        "max_throughput": 2882915,
+        "max_throughput_date": "2019-12-01"
+      },
+      "2023": {
+        "days": 365,
+        "min_date": "2023-01-01",
+        "max_date": "2023-12-31",
+        "mean_throughput": 2352187,
+        "median_throughput": 2402206,
+        "min_throughput": 1534786,
+        "min_throughput_date": "2023-01-31",
+        "max_throughput": 2908785,
+        "max_throughput_date": "2023-11-26"
+      },
+      "2024": {
+        "days": 366,
+        "min_date": "2024-01-01",
+        "max_date": "2024-12-31",
+        "mean_throughput": 2470133,
+        "median_throughput": 2551024,
+        "min_throughput": 1551896,
+        "min_throughput_date": "2024-11-28",
+        "max_throughput": 3088836,
+        "max_throughput_date": "2024-12-01"
+      },
+      "2025": {
+        "days": 365,
+        "min_date": "2025-01-01",
+        "max_date": "2025-12-31",
+        "mean_throughput": 2484208,
+        "median_throughput": 2532054,
+        "min_throughput": 1559165,
+        "min_throughput_date": "2025-11-27",
+        "max_throughput": 3134613,
+        "max_throughput_date": "2025-11-30"
+      },
+      "2026": {
+        "days": 316,
+        "min_date": "2026-01-01",
+        "max_date": "2026-11-12",
+        "mean_throughput": 2465104,
+        "median_throughput": 2534758,
+        "min_throughput": 1313323,
+        "min_throughput_date": "2026-01-25",
+        "max_throughput": 2988204,
+        "max_throughput_date": "2026-06-18"
+      }
+    }
+  },
+  "lookups": {
+    "L_AIRCRAFT_TYPE.csv": {
+      "row_count": 453,
+      "bytes": 14177,
+      "sha256": "4fdb4909c671582f0267a730b7a486cab218d2405076d95c344e4d4b2f77d4c4"
+    },
+    "L_AIRPORT_ID.csv": {
+      "row_count": 6918,
+      "bytes": 332844,
+      "sha256": "cff27be77b3da705cdce87fbfe6c07d93087468d5aa0d139bb816f637e97137d"
+    },
+    "L_CARRIER_HISTORY.csv": {
+      "row_count": 2077,
+      "bytes": 90106,
+      "sha256": "bd6514a8e0f0ba143a322b956e196b22ff8aae1cd10b8994e5b09eab9a4baf7b"
+    },
+    "L_AIRPORT.csv": {
+      "row_count": 6942,
+      "bytes": 320236,
+      "sha256": "7a3c2a0bbcdc6951c2ae6eefe1e5739cfeb86f5016006cec49e146bb54b9466d"
+    },
+    "L_UNIQUE_CARRIERS.csv": {
+      "row_count": 1780,
+      "bytes": 54274,
+      "sha256": "2ed6201cb689e77fc653bb9fce091fde2571c3d04dac35fa7e345987f7e0790b"
+    }
+  }
+}
