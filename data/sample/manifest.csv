@@ -1,0 +1,14 @@
+file,source_url,download_date,period_covered,row_count,sha256_checksum
+data/sample/faa/ACFTREF.txt,https://registry.faa.gov/database/ReleasableAircraft.zip,2026-11-13,1948..2026,19,b37c990031de986239662cd8f0aec6835e04ed9502a23f00af41c321238f688f
+data/sample/faa/DEREG.txt,https://registry.faa.gov/database/ReleasableAircraft.zip,2026-11-13,1948..2026,3,8c0bbbeafcc36e738b26320d33308a514b3cb73bb53580dd8c6e8340b89c2ecc
+data/sample/faa/MASTER.txt,https://registry.faa.gov/database/ReleasableAircraft.zip,2026-11-13,1948..2026,14,d5984f2eac7dbee59a927dd4dd2296d93d5b0d9ae48fe861fabfbb891a1102cc
+data/sample/lookups/L_AIRCRAFT_TYPE.csv,https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_NVePeNSg_glcR,2026-11-13,cumulative,453,82ddc5cf296304bfe2e908888b545279e202ee0864670756662874774b5e5763
+data/sample/lookups/L_AIRPORT.csv,https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_NVecbeg,2026-11-13,cumulative,145,98191e6058f04b824cfa86960dccfa86cd726992c64805e4a3340bfc77da9f72
+data/sample/lookups/L_AIRPORT_ID.csv,https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_NVecbeg_VQ,2026-11-13,cumulative,145,7a2c0b07b2358655ccb378077d4f16df79903c208345836b72e565a211dc9d94
+data/sample/lookups/L_CARRIER_HISTORY.csv,https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_PNeeVRe_UVfgbel,2026-11-13,cumulative,41,87f45eb844366be974acf471459e2564eea22b667eb9c5b294b643d2bf039959
+data/sample/lookups/L_UNIQUE_CARRIERS.csv,https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_haVdhR_PNeeVRef,2026-11-13,cumulative,26,5ff5095812c701e9f182fe18fceb66f3ce2ab4bafbd1d3767188085a4554c1ac
+data/sample/otp/otp_mkt_ord_ua_2019_01.csv,https://transtats.bts.gov/PREZIP/On_Time_Marketing_Carrier_On_Time_Performance_Beginning_January_2018_2019_1.zip,2026-11-13,2019-01,40,4ccadff43d1510f56cb49a06edb05d8724bf7210638519f07780873b81fb0b8d
+data/sample/otp/otp_mkt_ord_ua_2024_01.csv,https://transtats.bts.gov/PREZIP/On_Time_Marketing_Carrier_On_Time_Performance_Beginning_January_2018_2024_1.zip,2026-11-13,2024-01,40,5d759fb9ad55373642c980136345678f572c95f69123a3628575467462b67118
+data/sample/t100/t100_segment_all_2019.csv,https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FMG&QO_fu146_anzr=Nv4,2026-11-13,2019-01..2019-11,666,2e22f2d6e05959140c50ac004342f5d8d7ffb10bff399714b0029c1359d8c07c
+data/sample/t100/t100_segment_all_2024.csv,https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FMG&QO_fu146_anzr=Nv4,2026-11-13,2024-01..2024-12,808,41ef0f0a8e6857f3b64bbd654e053d08eb8674d7626b3b014b326584341fb93a
+data/sample/tsa/tsa_checkpoint_volumes.csv,https://www.tsa.gov/travel/passenger-volumes,2026-11-13,2019-01-01..2024-01-31,62,ad5563d679d98ae0d11e0ed4db5b539cf18ee456f5939df2cc84cc7f0fc2dfaa

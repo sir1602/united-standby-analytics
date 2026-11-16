@@ -1,0 +1,25 @@
+name: "united_standby_analytics"
+version: "0.1.0"
+config-version: 2
+
+profile: "united_standby_analytics"
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+vars:
+  default_hub: "ORD"
+  analysis_years: [2019, 2023, 2024, 2025, 2026]
+  marketing_carrier: "UA"
+
+models:
+  united_standby_analytics:
+    +materialized: view

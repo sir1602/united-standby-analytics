@@ -115,7 +115,7 @@ We use the combined **`FMG` (`T_T100_SEGMENT_ALL_CARRIER.csv`)** table so a sing
 ### 4.1 Scripted Direct Download URLs (ROT13 Parameter `Y11x72`)
 TranStats serves its lookup CSVs directly via `Download_Lookup.asp?Y11x72=<ROT13_TABLE_NAME>`:
 
-| Target File in `data/raw/lookups/` | Direct Scriptable URL | Verified Rows (`data/raw/lookups/`) |SHA-256 Checksum (`2026-11-13`) |
+| Target File in `data/raw/lookups/` | Direct Scriptable URL | Verified Rows (`data/raw/lookups/`) | SHA-256 Checksum (`2026-11-13`) |
 |---|---|---:|---|
 | `L_AIRCRAFT_TYPE.csv` | `https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_NVePeNSg_glcR` | `453` | `4fdb4909c671582f0267a730b7a486cab218d2405076d95c344e4d4b2f77d4c4` |
 | `L_AIRPORT_ID.csv` | `https://www.transtats.bts.gov/Download_Lookup.asp?Y11x72=Y_NVecbeg_VQ` | `6,918` | `cff27be77b3da705cdce87fbfe6c07d93087468d5aa0d139bb816f637e97137d` |

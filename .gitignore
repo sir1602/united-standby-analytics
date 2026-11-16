@@ -25,6 +25,8 @@ build/
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
+dbt/.user.yml
+.user.yml
 logs/
 
 # Secrets, environment variables, and GCP credentials
