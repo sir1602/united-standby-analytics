@@ -16,6 +16,17 @@ Non-revenue standby travelers board only after all revenue passengers — includ
 
 ---
 
+## Phase 0 Deliverables (Stop-Gate 1 Review)
+
+All actual raw files across all 5 sources (`56` monthly BTS Marketing Carrier OTP archives `2019-01..2019-12` & `2023-01..2026-08` covering `830,941` `ORD` `UA` flights out of `35,881,885` U.S. flights; `5` annual BTS T-100 Segment `FMG` archives covering `2,520,139` segment rows; `5` BTS Lookup tables; FAA `MASTER.txt` + `DEREG.txt` + `ACFTREF.txt`; and `1,777` TSA daily volume rows) have been empirically validated:
+
+- **[`docs/phase0_validation_report.md`](docs/phase0_validation_report.md):** Complete Phase 0 Empirical Validation Report (Tables 1–5: dataset inventory & null rates, field verification & Reporting vs. Marketing OTP discrepancy proof, OTP vs. T-100 reconciliation across years/carriers, FAA tail match rate lift from `DEREG.txt`, and 6+3 data quirks with verbatim examples) + End-to-End Architecture & Methodology Proposal (Mermaid diagram, 7-step join keys & 3-tier `lf_source` hierarchy, `soi_historical` & `soi_planning` mathematical equations, strict leakage boundary, and 11 metric limitations).
+- **[`docs/data_acquisition.md`](docs/data_acquisition.md):** Scripted acquisition methods and exact step-by-step manual browser download instructions (URLs, form selections, filters, checkboxes) for all 5 sources + `data/manifest.csv` checksum contract.
+- **[`docs/decisions.md`](docs/decisions.md):** Technical Decisions & Assumptions Log (`D-01` through `D-18`), combining the 13 baseline decisions and 5 empirical Phase 0 technical decisions.
+- **[`notebooks/00_phase0_validation.ipynb`](notebooks/00_phase0_validation.ipynb):** Executed Jupyter Notebook reproducing every table and empirical statistic in `docs/phase0_validation_report.md` from `data/raw/`.
+
+---
+
 ## Scope (v1)
 
 - **Hub:** `ORD` (Chicago O'Hare International Airport) departures. Hubs, carriers, and years are config-driven (`YAML`) so expanding to `DEN`, `IAH`, `EWR`, `SFO`, `IAD`, or `LAX` requires zero code changes.
@@ -51,7 +62,7 @@ united-standby-analytics/
 
 | Phase | PR | Milestone & Deliverables | Status |
 |---|---|---|---|
-| **Phase 0** | **PR #1** | **Phase 0 Validation Report + Architecture Proposal** (`docs/phase0_validation_report.md`, `docs/data_acquisition.md`, `docs/decisions.md`, `notebooks/00_phase0_validation.ipynb`) — *Stop Gate 1* | In Progress |
+| **Phase 0** | **PR #1** | **Phase 0 Validation Report + Architecture Proposal** (`docs/phase0_validation_report.md`, `docs/data_acquisition.md`, `docs/decisions.md`, `notebooks/00_phase0_validation.ipynb`) — *Stop Gate 1* | **Complete (Awaiting Gate 1 Review)** |
 | **Phase 1** | PR #2 | Ingestion + Checksummed `data/manifest.csv` + `pandera` Schemas + BigQuery `raw` Batch Load | Planned |
 | **Phase 2** | PR #3 | Flight-Level Enrichment + Curated Reference Tables (`reference/`) — *Stop Gate 2* | Planned |
 | **Phase 3** | PR #4 | `dbt Core` (`staging` → `intermediate` → `marts`) + Schema Tests + GitHub Actions CI | Planned |
