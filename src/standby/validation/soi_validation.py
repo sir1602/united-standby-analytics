@@ -559,6 +559,75 @@ def run_weight_sensitivity_analysis(
     }
 
 
+_HIST_ORDERED_WINDOWS: tuple[str, ...] = (
+    "late_jan_midweek",
+    "all_flights_baseline",
+    "spring_break",
+    "christmas_peak",
+    "thanksgiving_sunday",
+)
+
+_PLAN_ORDERED_WINDOWS: tuple[str, ...] = (
+    "late_jan_midweek",
+    "all_flights_baseline",
+    "spring_break",
+    "christmas_peak",
+)
+
+_PLAN_SEPARATION_MAX_P_VALUE = 1e-10
+
+
+def _empty_windows(window_stats: dict[str, Any], names: tuple[str, ...]) -> list[str]:
+    """Return the face-validity windows in `names` that have no scored flights (`mean is None`)."""
+    return [name for name in names if window_stats.get(name, {}).get("mean") is None]
+
+
+def _is_strictly_decreasing(values: list[float]) -> bool:
+    return all(a > b for a, b in zip(values, values[1:], strict=False))
+
+
+def _pillar_2_gate_failures(pillar_2: dict[str, Any]) -> list[str]:
+    """
+    Evaluate Pillar 2 face-validity gates, reporting empty windows as gate failures
+    instead of comparing `None` means.
+    """
+    failures: list[str] = []
+
+    h = pillar_2["soi_historical"]
+    empty_h = _empty_windows(h, _HIST_ORDERED_WINDOWS)
+    if empty_h:
+        failures.append(
+            f"Pillar 2 soi_historical has no scored flights in window(s) {empty_h}; "
+            "cannot evaluate peak/trough ordering"
+        )
+    elif not _is_strictly_decreasing([h[name]["mean"] for name in _HIST_ORDERED_WINDOWS]):
+        failures.append("Pillar 2 soi_historical monotonic peak/trough ordering violated")
+
+    p = pillar_2["soi_planning"]
+    empty_p = _empty_windows(p, (*_PLAN_ORDERED_WINDOWS, "thanksgiving_sunday"))
+    if empty_p:
+        failures.append(
+            f"Pillar 2 soi_planning has no scored flights in window(s) {empty_p}; "
+            "cannot evaluate ordering or Late-Jan vs Thanksgiving Sunday separation"
+        )
+        return failures
+
+    if not _is_strictly_decreasing([p[name]["mean"] for name in _PLAN_ORDERED_WINDOWS]):
+        failures.append("Pillar 2 soi_planning monotonic ordering violated")
+
+    sep = pillar_2["statistical_separation_tests"]["late_jan_vs_thanksgiving_sunday"][
+        "soi_planning"
+    ]
+    welch_p = sep.get("welch_p_value")
+    if (
+        p["late_jan_midweek"]["mean"] <= p["thanksgiving_sunday"]["mean"]
+        or welch_p is None
+        or welch_p >= _PLAN_SEPARATION_MAX_P_VALUE
+    ):
+        failures.append("Pillar 2 soi_planning Late-Jan > Thanksgiving Sunday separation failed")
+    return failures
+
+
 def run_soi_validation(
     flights_df: pd.DataFrame,
     t100_df: pd.DataFrame | None = None,
@@ -655,35 +724,7 @@ def run_soi_validation(
                 f"Pillar 1 Holdout planning_coverage_pct={hold.get('planning_coverage_pct')} < 0.95"
             )
 
-        # Pillar 2 ordering checks
-        h = pillar_2["soi_historical"]
-        if not (
-            h["late_jan_midweek"]["mean"]
-            > h["all_flights_baseline"]["mean"]
-            > h["spring_break"]["mean"]
-            > h["christmas_peak"]["mean"]
-            > h["thanksgiving_sunday"]["mean"]
-        ):
-            failures.append("Pillar 2 soi_historical monotonic peak/trough ordering violated")
-
-        p = pillar_2["soi_planning"]
-        if not (
-            p["late_jan_midweek"]["mean"]
-            > p["all_flights_baseline"]["mean"]
-            > p["spring_break"]["mean"]
-            > p["christmas_peak"]["mean"]
-        ):
-            failures.append("Pillar 2 soi_planning monotonic ordering violated")
-        sep = pillar_2["statistical_separation_tests"]["late_jan_vs_thanksgiving_sunday"][
-            "soi_planning"
-        ]
-        if (
-            p["late_jan_midweek"]["mean"] <= p["thanksgiving_sunday"]["mean"]
-            or (sep.get("welch_p_value") or 1.0) >= 1e-10
-        ):
-            failures.append(
-                "Pillar 2 soi_planning Late-Jan > Thanksgiving Sunday separation failed"
-            )
+        failures.extend(_pillar_2_gate_failures(pillar_2))
 
         if not pillar_3["ranking_stability_passed"]:
             failures.append("Pillar 3 weight sensitivity rho < 0.85 on core schemes")

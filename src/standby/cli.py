@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import click
 
@@ -14,7 +16,14 @@ from standby.logging_config import configure_logging
 from standby.manifest import build_manifest, verify_manifest
 from standby.schemas import validate_all_ingested
 
+if TYPE_CHECKING:
+    import pandas as pd
+
 logger = logging.getLogger("standby.cli")
+
+PROCESSED_OTP_FILE = "otp_marketing_flights.parquet"
+PROCESSED_T100_FILE = "t100_segments.parquet"
+PROCESSED_TSA_FILE = "tsa_daily_throughput.parquet"
 
 
 def _validate_years_option(
@@ -43,6 +52,61 @@ def _load_cli_config(
         return load_config(hub=hub, years=years, sample_mode=sample_mode, dry_run=dry_run)
     except ValueError as exc:
         raise click.BadParameter(str(exc), param_hint="'--years'") from exc
+
+
+def _processed_inputs_exist(mode_dir: Path) -> bool:
+    return all(
+        (mode_dir / name).is_file()
+        for name in (PROCESSED_OTP_FILE, PROCESSED_T100_FILE, PROCESSED_TSA_FILE)
+    )
+
+
+@dataclass(frozen=True)
+class _ProcessedInputs:
+    """Processed Parquet inputs scoped to the requested `--hub` / `--years`."""
+
+    flights: pd.DataFrame
+    t100: pd.DataFrame
+    tsa: pd.DataFrame
+    out_of_scope_flights: int
+    file_hubs: list[str]
+    file_years: list[int]
+    absent_years: list[int]
+
+
+def _read_processed_inputs(cfg: StandbyConfig, mode_dir: Path) -> _ProcessedInputs:
+    """
+    Read processed Parquets and scope them to `cfg.active_hub` and `cfg.years`, mirroring
+    `ingest_all_sources` (OTP & T-100: `origin == hub` and `year in years`; TSA: `year in years`).
+    """
+    import pandas as pd
+
+    flights_all = pd.read_parquet(mode_dir / PROCESSED_OTP_FILE)
+    t100_all = pd.read_parquet(mode_dir / PROCESSED_T100_FILE)
+    tsa_all = pd.read_parquet(mode_dir / PROCESSED_TSA_FILE)
+
+    hub = cfg.active_hub.strip().upper()
+    years = {int(y) for y in cfg.years}
+
+    def _hub_year_mask(df: pd.DataFrame) -> pd.Series:
+        return df["origin"].astype(str).str.strip().str.upper().eq(hub) & df["year"].astype(
+            "int64"
+        ).isin(years)
+
+    flight_mask = _hub_year_mask(flights_all)
+    tsa_years = pd.to_datetime(tsa_all["date_day"], errors="coerce").dt.year
+
+    flights = flights_all.loc[flight_mask].reset_index(drop=True)
+    present_years = {int(y) for y in flights["year"].unique()}
+    return _ProcessedInputs(
+        flights=flights,
+        t100=t100_all.loc[_hub_year_mask(t100_all)].reset_index(drop=True),
+        tsa=tsa_all.loc[tsa_years.isin(years)].reset_index(drop=True),
+        out_of_scope_flights=int((~flight_mask).sum()),
+        file_hubs=sorted(flights_all["origin"].astype(str).str.strip().str.upper().unique()),
+        file_years=sorted(int(y) for y in flights_all["year"].unique()),
+        absent_years=sorted(years - present_years),
+    )
 
 
 @click.group()
@@ -364,8 +428,6 @@ def score_cmd(
     """Compute Phase 4 `soi_historical` and `soi_planning` and write scored Parquet."""
     import json
 
-    import pandas as pd
-
     from standby.load.bigquery import prepare_dataframe_for_bigquery
     from standby.scoring import score_flights
     from standby.validation.sanity import (
@@ -376,14 +438,25 @@ def score_cmd(
 
     cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
     mode_dir = cfg.processed_dir / ("sample" if cfg.sample_mode else "full")
-    otp_pq = mode_dir / "otp_marketing_flights.parquet"
-    t100_pq = mode_dir / "t100_segments.parquet"
-    tsa_pq = mode_dir / "tsa_daily_throughput.parquet"
+    otp_pq = mode_dir / PROCESSED_OTP_FILE
 
-    if from_processed and otp_pq.is_file() and t100_pq.is_file() and tsa_pq.is_file():
-        enriched_df = pd.read_parquet(otp_pq)
-        t100_df = pd.read_parquet(t100_pq)
-        tsa_df = pd.read_parquet(tsa_pq)
+    if from_processed and _processed_inputs_exist(mode_dir):
+        inputs = _read_processed_inputs(cfg, mode_dir)
+        if inputs.out_of_scope_flights:
+            # Scoring writes back to `otp_pq`, so silently dropping out-of-scope rows would lose data.
+            raise click.ClickException(
+                f"{otp_pq} holds {inputs.out_of_scope_flights:,} flights outside "
+                f"--hub {cfg.active_hub} --years {cfg.years} (file covers hubs {inputs.file_hubs}, "
+                f"years {inputs.file_years}). Pass a matching --hub/--years, or use --recompute "
+                "to rebuild from raw sources."
+            )
+        if inputs.flights.empty:
+            raise click.ClickException(
+                f"{otp_pq} has no flights for --hub {cfg.active_hub} --years {cfg.years}."
+            )
+        enriched_df = inputs.flights
+        t100_df = inputs.t100
+        tsa_df = inputs.tsa
     else:
         from standby.enrichment.pipeline import run_enrichment_pipeline
 
@@ -459,15 +532,24 @@ def score_cmd(
     default=None,
     help="Path to write Phase 4 validation JSON summary.",
 )
+@click.option(
+    "--reuse-scores",
+    is_flag=True,
+    default=False,
+    help=(
+        "Validate SOI scores already stored in the processed Parquet instead of re-scoring "
+        "with the current config (faster, but scores may be stale)."
+    ),
+)
 def validate_index_cmd(
     hub: str | None,
     years: str | None,
     sample: bool,
     summary_path: Path | None,
+    reuse_scores: bool,
 ) -> None:
     """Run Section 6 validation suite (backtest, face-validity, weight sensitivity, SC-5)."""
-    import pandas as pd
-
+    from standby.scoring import SOI_OUTPUT_COLUMNS
     from standby.validation.soi_validation import run_soi_validation
 
     cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
@@ -478,14 +560,33 @@ def validate_index_cmd(
         else cfg.repo_root / "docs" / "phase4_validation_summary.json"
     )
 
-    otp_pq = mode_dir / "otp_marketing_flights.parquet"
-    t100_pq = mode_dir / "t100_segments.parquet"
-    tsa_pq = mode_dir / "tsa_daily_throughput.parquet"
-
-    if otp_pq.is_file() and t100_pq.is_file() and tsa_pq.is_file():
-        flights_df = pd.read_parquet(otp_pq)
-        t100_df = pd.read_parquet(t100_pq)
-        tsa_df = pd.read_parquet(tsa_pq)
+    if _processed_inputs_exist(mode_dir):
+        inputs = _read_processed_inputs(cfg, mode_dir)
+        if inputs.flights.empty:
+            raise click.ClickException(
+                f"{mode_dir / PROCESSED_OTP_FILE} has no flights for --hub {cfg.active_hub} "
+                f"--years {cfg.years} (file covers hubs {inputs.file_hubs}, "
+                f"years {inputs.file_years})."
+            )
+        if inputs.out_of_scope_flights:
+            logger.info(
+                f"Excluded {inputs.out_of_scope_flights:,} processed flights outside "
+                f"hub={cfg.active_hub} years={cfg.years}"
+            )
+        if inputs.absent_years:
+            logger.warning(
+                f"Requested years {inputs.absent_years} have no flights in the processed Parquet; "
+                "re-run `standby run` for those years to include them"
+            )
+        flights_df = inputs.flights
+        t100_df = inputs.t100
+        tsa_df = inputs.tsa
+        if not reuse_scores:
+            # Drop stored SOI outputs so `run_soi_validation` re-scores the scoped flights with the
+            # current config (stored scores may come from other years, hubs, or weights).
+            flights_df = flights_df.drop(
+                columns=[c for c in SOI_OUTPUT_COLUMNS if c in flights_df.columns]
+            )
     else:
         from standby.enrichment.pipeline import run_enrichment_pipeline
         from standby.scoring import score_flights
