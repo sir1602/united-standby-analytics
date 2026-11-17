@@ -25,6 +25,24 @@ vars:
   tsa_multiplier_min: 0.80
   tsa_multiplier_max: 1.20
   min_faa_tc_max_seats: 20
+  # Phase 4 Standby Opportunity Index (SOI) weights & parameters
+  soi_weight_open: 0.50
+  soi_weight_disp: 0.20
+  soi_weight_backup: 0.20
+  soi_weight_demand: 0.10
+  open_abs_cap: 25.0
+  open_pct_cap: 0.30
+  open_abs_weight: 0.50
+  disp_diversion_weight: 0.50
+  disp_hist_cap: 2.0
+  disp_hist_decay: 0.75
+  disp_plan_cap: 0.25
+  disp_plan_beta: 0.65
+  disp_plan_min_obs: 5
+  backup_cap: 6
+  demand_r_min: 0.65
+  demand_r_max: 1.35
+  demand_holiday_boost: 0.10
 
 models:
   united_standby_analytics:

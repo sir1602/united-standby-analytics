@@ -11,6 +11,10 @@ import yaml
 
 YEAR_TOKEN_RE = re.compile(r"^\d{4}$")
 
+DEFAULT_UA_FAMILY_CARRIERS: frozenset[str] = frozenset(
+    {"UA", "OO", "YX", "YV", "G7", "C5", "ZW", "EV", "AX"}
+)
+
 
 @dataclass(frozen=True)
 class HourBlockSpec:
@@ -76,6 +80,25 @@ class SanityCheckConfig:
     sample_min_t100_rows: int = 500
 
 
+@dataclass(frozen=True)
+class ScoringConfig:
+    """Configuration parameters for Phase 4 Standby Opportunity Index scoring."""
+
+    open_seats_abs_cap: float = 25.0
+    open_seats_pct_cap: float = 0.30
+    open_seats_abs_weight: float = 0.50
+    disp_diversion_weight: float = 0.50
+    disp_decay_base: float = 0.75
+    disp_hist_cap: float = 2.0
+    disp_plan_prior_factor: float = 0.65
+    disp_plan_cap: float = 0.25
+    disp_plan_min_obs: int = 5
+    backup_max_flights: int = 6
+    demand_holiday_adder: float = 0.10
+    demand_ratio_min: float = 0.65
+    demand_ratio_max: float = 1.35
+
+
 @dataclass
 class StandbyConfig:
     """Typed pipeline configuration resolved from `config/standby.yaml`."""
@@ -101,6 +124,7 @@ class StandbyConfig:
     bigquery: BigQueryConfig
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     sanity_checks: SanityCheckConfig = field(default_factory=SanityCheckConfig)
+    scoring: ScoringConfig = field(default_factory=ScoringConfig)
     sample_mode: bool = False
     dry_run: bool = False
     raw_yaml: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -142,6 +166,24 @@ class StandbyConfig:
             return float(self.enrichment.hour_block_multipliers[hour_block])
         spec = self.hour_blocks.get(hour_block)
         return spec.load_multiplier if spec is not None else 1.0
+
+    def get_index_weights(self) -> dict[str, float]:
+        """Return validated/normalized SOI component weights."""
+        defaults = {
+            "open_seats": 0.50,
+            "displacement_pressure": 0.20,
+            "backup_options": 0.20,
+            "day_holiday_demand": 0.10,
+        }
+        raw = {
+            k: float(self.index_weights.get(k, default_val)) for k, default_val in defaults.items()
+        }
+        total = sum(raw.values())
+        if total <= 0.0:
+            raise ValueError(f"SOI index_weights sum must be positive, got {raw}")
+        if any(v < 0.0 for v in raw.values()):
+            raise ValueError(f"SOI index_weights must be non-negative, got {raw}")
+        return {k: v / total for k, v in raw.items()}
 
 
 def parse_years_arg(years_str: str | None, default_years: list[int]) -> list[int]:
@@ -311,6 +353,32 @@ def load_config(
         ),
     )
 
+    scr_raw = raw.get("scoring", {})
+    default_scr = ScoringConfig()
+    scoring_config = ScoringConfig(
+        open_seats_abs_cap=float(scr_raw.get("open_seats_abs_cap", default_scr.open_seats_abs_cap)),
+        open_seats_pct_cap=float(scr_raw.get("open_seats_pct_cap", default_scr.open_seats_pct_cap)),
+        open_seats_abs_weight=float(
+            scr_raw.get("open_seats_abs_weight", default_scr.open_seats_abs_weight)
+        ),
+        disp_diversion_weight=float(
+            scr_raw.get("disp_diversion_weight", default_scr.disp_diversion_weight)
+        ),
+        disp_decay_base=float(scr_raw.get("disp_decay_base", default_scr.disp_decay_base)),
+        disp_hist_cap=float(scr_raw.get("disp_hist_cap", default_scr.disp_hist_cap)),
+        disp_plan_prior_factor=float(
+            scr_raw.get("disp_plan_prior_factor", default_scr.disp_plan_prior_factor)
+        ),
+        disp_plan_cap=float(scr_raw.get("disp_plan_cap", default_scr.disp_plan_cap)),
+        disp_plan_min_obs=int(scr_raw.get("disp_plan_min_obs", default_scr.disp_plan_min_obs)),
+        backup_max_flights=int(scr_raw.get("backup_max_flights", default_scr.backup_max_flights)),
+        demand_holiday_adder=float(
+            scr_raw.get("demand_holiday_adder", default_scr.demand_holiday_adder)
+        ),
+        demand_ratio_min=float(scr_raw.get("demand_ratio_min", default_scr.demand_ratio_min)),
+        demand_ratio_max=float(scr_raw.get("demand_ratio_max", default_scr.demand_ratio_max)),
+    )
+
     return StandbyConfig(
         project_name=str(proj.get("name", "united-standby-analytics")),
         project_version=str(proj.get("version", "0.1.0")),
@@ -334,6 +402,7 @@ def load_config(
         bigquery=bq_config,
         enrichment=enrichment_config,
         sanity_checks=sanity_config,
+        scoring=scoring_config,
         sample_mode=sample_mode,
         dry_run=dry_run,
         raw_yaml=raw,

@@ -8,8 +8,7 @@ from typing import Any, Literal
 
 import pandas as pd
 
-from standby.config import SanityCheckConfig, StandbyConfig
-from standby.enrichment.load_factor import DEFAULT_UA_FAMILY_CARRIERS
+from standby.config import DEFAULT_UA_FAMILY_CARRIERS, SanityCheckConfig, StandbyConfig
 
 logger = logging.getLogger("standby.validation.sanity")
 
@@ -515,20 +514,35 @@ def check_sc5_missing_t100_null_invariant(enriched_df: pd.DataFrame) -> SanityCh
                 non_null = int(sub[col].notna().sum())
                 if non_null > 0:
                     violations[col] = non_null
-        for soi_col in ("soi_historical", "soi_planning"):
+        for soi_col in (
+            "s_open_hist",
+            "s_disp_hist",
+            "s_backup_hist",
+            "s_demand_hist",
+            "soi_historical",
+            "s_open_plan",
+            "s_disp_plan",
+            "s_backup_plan",
+            "s_demand_plan",
+            "soi_planning",
+        ):
             if soi_col in sub.columns:
                 non_null = int(sub[soi_col].notna().sum())
                 if non_null > 0:
                     violations[soi_col] = non_null
 
-    if "soi_historical" in enriched_df.columns:
-        canc_soi = int(
-            enriched_df.loc[enriched_df["is_cancelled"].astype(bool), "soi_historical"]
-            .notna()
-            .sum()
-        )
-        if canc_soi > 0:
-            violations["soi_historical_cancelled"] = canc_soi
+    canc_mask = enriched_df["is_cancelled"].astype(bool)
+    for hist_col in (
+        "s_open_hist",
+        "s_disp_hist",
+        "s_backup_hist",
+        "s_demand_hist",
+        "soi_historical",
+    ):
+        if hist_col in enriched_df.columns:
+            canc_val = int(enriched_df.loc[canc_mask, hist_col].notna().sum())
+            if canc_val > 0:
+                violations[f"{hist_col}_cancelled"] = canc_val
 
     total_violations = sum(violations.values())
     status: CheckStatus = "FAIL" if total_violations > 0 else "PASS"
@@ -543,6 +557,52 @@ def check_sc5_missing_t100_null_invariant(enriched_df: pd.DataFrame) -> SanityCh
         message=msg,
         details={
             "unmatched_t100_rows": unmatched_count,
+            "violations_by_column": violations,
+            "total_violations": total_violations,
+        },
+    )
+
+
+def check_soi_bounds(scored_df: pd.DataFrame) -> SanityCheckResult:
+    """Verify all non-null SOI composite and sub-score columns lie strictly within `[0.0, 100.0]`."""
+    score_cols = (
+        "s_open_hist",
+        "s_disp_hist",
+        "s_backup_hist",
+        "s_demand_hist",
+        "soi_historical",
+        "s_open_plan",
+        "s_disp_plan",
+        "s_backup_plan",
+        "s_demand_plan",
+        "soi_planning",
+    )
+    violations: dict[str, int] = {}
+    checked_cols = 0
+    for col in score_cols:
+        if col not in scored_df.columns:
+            continue
+        checked_cols += 1
+        vals = pd.to_numeric(scored_df[col], errors="coerce").dropna()
+        if vals.empty:
+            continue
+        bad = int(((vals < 0.0) | (vals > 100.0)).sum())
+        if bad > 0:
+            violations[col] = bad
+
+    total_violations = sum(violations.values())
+    status: CheckStatus = "FAIL" if total_violations > 0 else "PASS"
+    msg = (
+        f"Checked {checked_cols} SOI score/sub-score columns; "
+        f"out-of-bounds violations={total_violations}"
+    )
+    return SanityCheckResult(
+        check_id="SOI-BOUNDS",
+        name="Standby Opportunity Index [0, 100] Bounds",
+        status=status,
+        message=msg,
+        details={
+            "checked_columns": checked_cols,
             "violations_by_column": violations,
             "total_violations": total_violations,
         },

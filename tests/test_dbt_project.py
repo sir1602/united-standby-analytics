@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 import subprocess
 import sys
@@ -14,6 +15,7 @@ import pytest
 
 from standby.config import load_config
 from standby.enrichment import enrich_flights
+from standby.scoring import holiday_name, is_holiday_window, score_flights
 
 SEED_FILES: tuple[str, ...] = (
     "seat_config.csv",
@@ -46,6 +48,7 @@ EXPECTED_INTERMEDIATE_MODELS: tuple[str, ...] = (
     "int_t100_load_factors",
     "int_flight_estimates",
     "int_flight_displacements_backups",
+    "int_flights_soi_scored",
 )
 
 
@@ -216,9 +219,10 @@ def test_dbt_manifest_models_schemas_partitioning_and_tests(
         "assert_sc1_passenger_bounds",
         "assert_sc5_no_silent_t100_imputation",
         "assert_fct_flights_grain_unique",
+        "assert_soi_leakage_and_bounds",
     }.issubset(singular_names)
 
-    # 6. Compiled SQL checks: stg_otp_flights selects only 31 base cols; fct_flights has NULL SOI placeholders
+    # 6. Compiled SQL checks: stg_otp_flights selects only 31 base cols; fct_flights exposes Phase 4 SOI
     compiled_dir = repo_root / "dbt" / "target" / "compiled" / "united_standby_analytics" / "models"
     stg_otp_sql = (compiled_dir / "staging" / "stg_otp_flights.sql").read_text(encoding="utf-8")
     for enrichment_only_col in (
@@ -229,9 +233,29 @@ def test_dbt_manifest_models_schemas_partitioning_and_tests(
     ):
         assert enrichment_only_col not in stg_otp_sql
 
-    fct_sql = (compiled_dir / "marts" / "fct_flights.sql").read_text(encoding="utf-8")
-    assert "cast(null as float64) as soi_historical" in fct_sql.lower()
-    assert "cast(null as float64) as soi_planning" in fct_sql.lower()
+    fct_sql = (compiled_dir / "marts" / "fct_flights.sql").read_text(encoding="utf-8").lower()
+    assert "int_flights_soi_scored" in fct_sql
+    for soi_col in (
+        "s_open_hist",
+        "s_disp_hist",
+        "s_backup_hist",
+        "s_demand_hist",
+        "soi_historical",
+        "s_open_plan",
+        "s_disp_plan",
+        "s_backup_plan",
+        "s_demand_plan",
+        "soi_planning",
+    ):
+        assert soi_col in fct_sql
+
+    int_soi_sql = (
+        (compiled_dir / "intermediate" / "int_flights_soi_scored.sql")
+        .read_text(encoding="utf-8")
+        .lower()
+    )
+    assert "f.year < ey.eval_year" in int_soi_sql
+    assert "prior_strict_scheduled_count" in int_soi_sql
 
 
 def _build_sample_sqlite_db(
@@ -239,6 +263,9 @@ def _build_sample_sqlite_db(
 ) -> sqlite3.Connection:
     """Load standardized sample inputs and dbt seeds into an in-memory SQLite DB for SQL parity tests."""
     conn = sqlite3.connect(":memory:")
+    conn.create_function("LN", 1, math.log)
+    conn.create_function("HOLIDAY_WINDOW", 1, lambda s: 1 if is_holiday_window(s) else 0)
+    conn.create_function("HOLIDAY_NAME", 1, holiday_name)
 
     otp_base_cols = [
         "flight_date",
@@ -477,6 +504,10 @@ def _build_sample_sqlite_db(
         )
         SELECT
             date_day,
+            CAST(SUBSTR(date_day, 1, 4) AS INTEGER) AS year,
+            CAST(SUBSTR(date_day, 6, 2) AS INTEGER) AS month,
+            ((CAST(STRFTIME('%w', date_day) AS INTEGER) + 6) % 7) + 1 AS iso_dow,
+            HOLIDAY_WINDOW(date_day) AS is_holiday_window,
             tsa_throughput,
             tsa_throughput * 1.0 / tsa_month_mean AS tsa_ratio_month,
             MIN(1.20, MAX(0.80, 1.0 + 0.35 * ((tsa_throughput * 1.0 / tsa_month_mean) - 1.0))) AS tsa_demand_multiplier,
@@ -698,6 +729,7 @@ def _build_sample_sqlite_db(
             i.flight_id,
             i.route_day_seq,
             i.route_day_seq - 1 AS prior_scheduled_count,
+            SUM(CASE WHEN j.crs_dep_time < i.crs_dep_time THEN 1 ELSE 0 END) AS prior_strict_scheduled_count,
             COALESCE(SUM(
                 CASE
                     WHEN j.route_day_seq < i.route_day_seq AND (j.is_cancelled = 1 OR j.is_diverted = 1)
@@ -711,18 +743,171 @@ def _build_sample_sqlite_db(
         LEFT JOIN ordered j ON i.origin = j.origin AND i.dest = j.dest AND i.flight_date = j.flight_date
         GROUP BY i.flight_id, i.route_day_seq;
 
+        CREATE VIEW int_flights_soi_scored AS
+        WITH base_flights AS (
+            SELECT
+                e.*,
+                db.route_day_seq,
+                db.prior_scheduled_count,
+                db.prior_strict_scheduled_count,
+                db.weighted_displacement_hist,
+                db.remaining_scheduled_backups,
+                db.remaining_performed_backups,
+                tsa.tsa_ratio_year,
+                e.day_of_week AS iso_dow,
+                HOLIDAY_NAME(e.flight_date) AS holiday_name,
+                HOLIDAY_WINDOW(e.flight_date) AS is_holiday_window,
+                CASE WHEN e.t100_available = 1 AND e.lf_source != 'UNMATCHED' THEN 1 ELSE 0 END AS has_t100_gate,
+                CASE WHEN e.t100_available = 1 AND e.lf_source != 'UNMATCHED' AND e.est_load_factor IS NOT NULL THEN 1 ELSE 0 END AS has_valid_t100
+            FROM int_flight_estimates e
+            LEFT JOIN int_flight_displacements_backups db ON e.flight_id = db.flight_id
+            LEFT JOIN stg_tsa_throughput tsa ON e.flight_date = tsa.date_day
+        ),
+        eval_years AS (
+            SELECT DISTINCT year AS eval_year FROM base_flights
+        ),
+        modal_t1 AS (
+            SELECT eval_year, op_carrier, origin, dest, month, hour_block, seats_config AS seats_config_plan, bts_aircraft_type AS bts_type_plan
+            FROM (
+                SELECT ey.eval_year, f.op_carrier, f.origin, f.dest, f.month, f.hour_block, f.seats_config, f.bts_aircraft_type,
+                       ROW_NUMBER() OVER (PARTITION BY ey.eval_year, f.op_carrier, f.origin, f.dest, f.month, f.hour_block ORDER BY COUNT(*) DESC, f.seats_config ASC, f.bts_aircraft_type ASC) AS rn
+                FROM base_flights f JOIN eval_years ey ON f.year < ey.eval_year
+                WHERE f.seats_config IS NOT NULL AND f.seats_config > 0 AND f.bts_aircraft_type IS NOT NULL AND TRIM(f.bts_aircraft_type) != ''
+                GROUP BY ey.eval_year, f.op_carrier, f.origin, f.dest, f.month, f.hour_block, f.seats_config, f.bts_aircraft_type
+            ) WHERE rn = 1
+        ),
+        modal_t2 AS (
+            SELECT eval_year, op_carrier, origin, dest, month, seats_config AS seats_config_plan, bts_aircraft_type AS bts_type_plan
+            FROM (
+                SELECT ey.eval_year, f.op_carrier, f.origin, f.dest, f.month, f.seats_config, f.bts_aircraft_type,
+                       ROW_NUMBER() OVER (PARTITION BY ey.eval_year, f.op_carrier, f.origin, f.dest, f.month ORDER BY COUNT(*) DESC, f.seats_config ASC, f.bts_aircraft_type ASC) AS rn
+                FROM base_flights f JOIN eval_years ey ON f.year < ey.eval_year
+                WHERE f.seats_config IS NOT NULL AND f.seats_config > 0 AND f.bts_aircraft_type IS NOT NULL AND TRIM(f.bts_aircraft_type) != ''
+                GROUP BY ey.eval_year, f.op_carrier, f.origin, f.dest, f.month, f.seats_config, f.bts_aircraft_type
+            ) WHERE rn = 1
+        ),
+        modal_t3 AS (
+            SELECT eval_year, op_carrier, origin, dest, seats_config AS seats_config_plan, bts_aircraft_type AS bts_type_plan
+            FROM (
+                SELECT ey.eval_year, f.op_carrier, f.origin, f.dest, f.seats_config, f.bts_aircraft_type,
+                       ROW_NUMBER() OVER (PARTITION BY ey.eval_year, f.op_carrier, f.origin, f.dest ORDER BY COUNT(*) DESC, f.seats_config ASC, f.bts_aircraft_type ASC) AS rn
+                FROM base_flights f JOIN eval_years ey ON f.year < ey.eval_year
+                WHERE f.seats_config IS NOT NULL AND f.seats_config > 0 AND f.bts_aircraft_type IS NOT NULL AND TRIM(f.bts_aircraft_type) != ''
+                GROUP BY ey.eval_year, f.op_carrier, f.origin, f.dest, f.seats_config, f.bts_aircraft_type
+            ) WHERE rn = 1
+        ),
+        modal_t4 AS (
+            SELECT eval_year, origin, dest, seats_config AS seats_config_plan, bts_aircraft_type AS bts_type_plan
+            FROM (
+                SELECT ey.eval_year, f.origin, f.dest, f.seats_config, f.bts_aircraft_type,
+                       ROW_NUMBER() OVER (PARTITION BY ey.eval_year, f.origin, f.dest ORDER BY COUNT(*) DESC, f.seats_config ASC, f.bts_aircraft_type ASC) AS rn
+                FROM base_flights f JOIN eval_years ey ON f.year < ey.eval_year
+                WHERE f.seats_config IS NOT NULL AND f.seats_config > 0 AND f.bts_aircraft_type IS NOT NULL AND TRIM(f.bts_aircraft_type) != ''
+                GROUP BY ey.eval_year, f.origin, f.dest, f.seats_config, f.bts_aircraft_type
+            ) WHERE rn = 1
+        ),
+        dom_t100_train AS (
+            SELECT ey.eval_year, t.op_carrier, t.origin, t.dest, t.month, t.bts_aircraft_type, t.is_ua_family, t.departures_performed, t.seats, t.passengers
+            FROM stg_t100_segments t JOIN eval_years ey ON t.year < ey.eval_year
+            WHERE t.data_source IN ('DU', 'DF')
+        ),
+        lf_t1 AS (
+            SELECT eval_year, op_carrier, origin, dest, month, bts_aircraft_type, MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats))) AS lf
+            FROM dom_t100_train WHERE bts_aircraft_type IS NOT NULL AND TRIM(bts_aircraft_type) != ''
+            GROUP BY eval_year, op_carrier, origin, dest, month, bts_aircraft_type HAVING SUM(seats) > 0 AND SUM(departures_performed) > 0
+        ),
+        lf_t2 AS (
+            SELECT eval_year, op_carrier, origin, dest, month, MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats))) AS lf
+            FROM dom_t100_train GROUP BY eval_year, op_carrier, origin, dest, month HAVING SUM(seats) > 0 AND SUM(departures_performed) > 0
+        ),
+        lf_t3 AS (
+            SELECT eval_year, origin, dest, month, MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats))) AS lf
+            FROM dom_t100_train WHERE is_ua_family = 1 GROUP BY eval_year, origin, dest, month HAVING SUM(seats) > 0 AND SUM(departures_performed) > 0
+        ),
+        lf_t4 AS (
+            SELECT eval_year, op_carrier, origin, dest, MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats))) AS lf
+            FROM dom_t100_train GROUP BY eval_year, op_carrier, origin, dest HAVING SUM(seats) > 0 AND SUM(departures_performed) > 0
+        ),
+        lf_t5 AS (
+            SELECT eval_year, origin, dest, MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats))) AS lf
+            FROM dom_t100_train WHERE is_ua_family = 1 GROUP BY eval_year, origin, dest HAVING SUM(seats) > 0 AND SUM(departures_performed) > 0
+        ),
+        disr_train AS (
+            SELECT ey.eval_year, f.origin, f.dest, f.month, f.hour_block,
+                   CASE WHEN f.is_cancelled = 1 THEN 1.0 WHEN f.is_diverted = 1 THEN 0.5 ELSE 0.0 END AS w
+            FROM base_flights f JOIN eval_years ey ON f.year < ey.eval_year
+        ),
+        q_t1 AS (SELECT eval_year, origin, dest, month, hour_block, AVG(w) AS q_hat FROM disr_train GROUP BY eval_year, origin, dest, month, hour_block HAVING COUNT(*) >= 5),
+        q_t2 AS (SELECT eval_year, origin, dest, month, AVG(w) AS q_hat FROM disr_train GROUP BY eval_year, origin, dest, month HAVING COUNT(*) >= 5),
+        q_t3 AS (SELECT eval_year, origin, dest, AVG(w) AS q_hat FROM disr_train GROUP BY eval_year, origin, dest),
+        q_t4 AS (SELECT eval_year, AVG(w) AS q_hat FROM disr_train GROUP BY eval_year),
+        tsa_train AS (
+            SELECT ey.eval_year, t.month, t.iso_dow, t.is_holiday_window, t.tsa_ratio_month, t.tsa_ratio_year
+            FROM stg_tsa_throughput t JOIN eval_years ey ON t.year < ey.eval_year
+            WHERE t.tsa_ratio_month IS NOT NULL AND t.tsa_ratio_year IS NOT NULL
+        ),
+        tsa_t1 AS (SELECT eval_year, month, iso_dow, is_holiday_window, AVG(tsa_ratio_month) AS r_month, AVG(tsa_ratio_year) AS r_year FROM tsa_train GROUP BY eval_year, month, iso_dow, is_holiday_window),
+        tsa_t2 AS (SELECT eval_year, month, iso_dow, AVG(tsa_ratio_month) AS r_month, AVG(tsa_ratio_year) AS r_year FROM tsa_train GROUP BY eval_year, month, iso_dow),
+        tsa_t3 AS (SELECT eval_year, month, AVG(tsa_ratio_month) AS r_month, AVG(tsa_ratio_year) AS r_year FROM tsa_train GROUP BY eval_year, month),
+        tsa_t4 AS (SELECT eval_year, AVG(tsa_ratio_month) AS r_month, AVG(tsa_ratio_year) AS r_year FROM tsa_train GROUP BY eval_year),
+        pm AS (
+            SELECT f.*,
+                   CASE WHEN m1.seats_config_plan IS NOT NULL THEN m1.seats_config_plan WHEN m2.seats_config_plan IS NOT NULL THEN m2.seats_config_plan WHEN m3.seats_config_plan IS NOT NULL THEN m3.seats_config_plan ELSE m4.seats_config_plan END AS seats_config_plan,
+                   CASE WHEN m1.seats_config_plan IS NOT NULL THEN m1.bts_type_plan WHEN m2.seats_config_plan IS NOT NULL THEN m2.bts_type_plan WHEN m3.seats_config_plan IS NOT NULL THEN m3.bts_type_plan ELSE m4.bts_type_plan END AS bts_type_plan,
+                   COALESCE(q1.q_hat, q2.q_hat, q3.q_hat, q4.q_hat) AS q_hat_plan,
+                   CASE WHEN tt1.r_month IS NOT NULL THEN tt1.r_month WHEN tt2.r_month IS NOT NULL THEN tt2.r_month WHEN tt3.r_month IS NOT NULL THEN tt3.r_month ELSE tt4.r_month END AS r_tsa_month_plan,
+                   CASE WHEN tt1.r_year IS NOT NULL THEN tt1.r_year WHEN tt2.r_year IS NOT NULL THEN tt2.r_year WHEN tt3.r_year IS NOT NULL THEN tt3.r_year ELSE tt4.r_year END AS r_tsa_year_plan
+            FROM base_flights f
+            LEFT JOIN modal_t1 m1 ON f.year = m1.eval_year AND f.op_carrier = m1.op_carrier AND f.origin = m1.origin AND f.dest = m1.dest AND f.month = m1.month AND f.hour_block = m1.hour_block
+            LEFT JOIN modal_t2 m2 ON f.year = m2.eval_year AND f.op_carrier = m2.op_carrier AND f.origin = m2.origin AND f.dest = m2.dest AND f.month = m2.month
+            LEFT JOIN modal_t3 m3 ON f.year = m3.eval_year AND f.op_carrier = m3.op_carrier AND f.origin = m3.origin AND f.dest = m3.dest
+            LEFT JOIN modal_t4 m4 ON f.year = m4.eval_year AND f.origin = m4.origin AND f.dest = m4.dest
+            LEFT JOIN q_t1 q1 ON f.year = q1.eval_year AND f.origin = q1.origin AND f.dest = q1.dest AND f.month = q1.month AND f.hour_block = q1.hour_block
+            LEFT JOIN q_t2 q2 ON f.year = q2.eval_year AND f.origin = q2.origin AND f.dest = q2.dest AND f.month = q2.month
+            LEFT JOIN q_t3 q3 ON f.year = q3.eval_year AND f.origin = q3.origin AND f.dest = q3.dest
+            LEFT JOIN q_t4 q4 ON f.year = q4.eval_year
+            LEFT JOIN tsa_t1 tt1 ON f.year = tt1.eval_year AND f.month = tt1.month AND f.iso_dow = tt1.iso_dow AND f.is_holiday_window = tt1.is_holiday_window
+            LEFT JOIN tsa_t2 tt2 ON f.year = tt2.eval_year AND f.month = tt2.month AND f.iso_dow = tt2.iso_dow
+            LEFT JOIN tsa_t3 tt3 ON f.year = tt3.eval_year AND f.month = tt3.month
+            LEFT JOIN tsa_t4 tt4 ON f.year = tt4.eval_year
+        ),
+        pi AS (
+            SELECT pm.*, COALESCE(l1.lf, l2.lf, l3.lf, l4.lf, l5.lf) AS lf_plan
+            FROM pm
+            LEFT JOIN lf_t1 l1 ON pm.year = l1.eval_year AND pm.op_carrier = l1.op_carrier AND pm.origin = l1.origin AND pm.dest = l1.dest AND pm.month = l1.month AND pm.bts_type_plan = l1.bts_aircraft_type
+            LEFT JOIN lf_t2 l2 ON pm.year = l2.eval_year AND pm.op_carrier = l2.op_carrier AND pm.origin = l2.origin AND pm.dest = l2.dest AND pm.month = l2.month
+            LEFT JOIN lf_t3 l3 ON pm.year = l3.eval_year AND pm.origin = l3.origin AND pm.dest = l3.dest AND pm.month = l3.month
+            LEFT JOIN lf_t4 l4 ON pm.year = l4.eval_year AND pm.op_carrier = l4.op_carrier AND pm.origin = l4.origin AND pm.dest = l4.dest
+            LEFT JOIN lf_t5 l5 ON pm.year = l5.eval_year AND pm.origin = l5.origin AND pm.dest = l5.dest
+        ),
+        calc AS (
+            SELECT *,
+                   CASE WHEN has_valid_t100 = 1 AND is_cancelled = 0 AND seats_config IS NOT NULL AND seats_config > 0 AND est_open_seats_adjusted IS NOT NULL AND tsa_ratio_year IS NOT NULL THEN 1 ELSE 0 END AS eligible_hist,
+                   CASE WHEN has_t100_gate = 1 AND seats_config_plan IS NOT NULL AND seats_config_plan > 0 AND lf_plan IS NOT NULL AND q_hat_plan IS NOT NULL AND r_tsa_month_plan IS NOT NULL AND r_tsa_year_plan IS NOT NULL THEN 1 ELSE 0 END AS eligible_plan,
+                   CASE WHEN seats_config_plan IS NOT NULL AND seats_config_plan > 0 AND lf_plan IS NOT NULL AND r_tsa_month_plan IS NOT NULL
+                        THEN seats_config_plan - MIN(seats_config_plan, MAX(0, CAST(ROUND(seats_config_plan * MIN(1.0, MAX(0.0, lf_plan * MIN(1.20, MAX(0.80, 1.0 + 0.35 * (r_tsa_month_plan - 1.0))) * hour_block_multiplier))) AS INTEGER)))
+                        ELSE NULL END AS est_open_plan_adj
+            FROM pi
+        ),
+        subs AS (
+            SELECT *,
+                   CASE WHEN eligible_hist = 1 THEN 0.50 * (100.0 * MIN(1.0, MAX(0.0, est_open_seats_adjusted * 1.0 / 25.0))) + 0.50 * (100.0 * MIN(1.0, MAX(0.0, (est_open_seats_adjusted * 1.0 / seats_config) / 0.30))) ELSE NULL END AS s_open_hist,
+                   CASE WHEN eligible_hist = 1 THEN 100.0 * MAX(0.0, MIN(1.0, 1.0 - weighted_displacement_hist / 2.0)) ELSE NULL END AS s_disp_hist,
+                   CASE WHEN eligible_hist = 1 THEN 100.0 * MIN(1.0, MAX(0.0, LN(1.0 + remaining_performed_backups) / LN(7.0))) ELSE NULL END AS s_backup_hist,
+                   CASE WHEN eligible_hist = 1 THEN 100.0 * MIN(1.0, MAX(0.0, (1.35 - (tsa_ratio_year + CASE WHEN is_holiday_window = 1 THEN 0.10 ELSE 0.0 END)) / 0.70)) ELSE NULL END AS s_demand_hist,
+                   CASE WHEN eligible_plan = 1 THEN 0.50 * (100.0 * MIN(1.0, MAX(0.0, est_open_plan_adj * 1.0 / 25.0))) + 0.50 * (100.0 * MIN(1.0, MAX(0.0, (est_open_plan_adj * 1.0 / seats_config_plan) / 0.30))) ELSE NULL END AS s_open_plan,
+                   CASE WHEN eligible_plan = 1 THEN 100.0 * MAX(0.0, MIN(1.0, 1.0 - (prior_strict_scheduled_count * q_hat_plan * 0.65 + q_hat_plan) / 0.25)) ELSE NULL END AS s_disp_plan,
+                   CASE WHEN eligible_plan = 1 THEN 100.0 * MIN(1.0, MAX(0.0, LN(1.0 + remaining_scheduled_backups) / LN(7.0))) ELSE NULL END AS s_backup_plan,
+                   CASE WHEN eligible_plan = 1 THEN 100.0 * MIN(1.0, MAX(0.0, (1.35 - (r_tsa_year_plan + CASE WHEN is_holiday_window = 1 THEN 0.10 ELSE 0.0 END)) / 0.70)) ELSE NULL END AS s_demand_plan
+            FROM calc
+        )
+        SELECT *,
+               CASE WHEN eligible_hist = 1 THEN ROUND(0.50 * s_open_hist + 0.20 * s_disp_hist + 0.20 * s_backup_hist + 0.10 * s_demand_hist, 2) ELSE NULL END AS soi_historical,
+               CASE WHEN eligible_plan = 1 THEN ROUND(0.50 * s_open_plan + 0.20 * s_disp_plan + 0.20 * s_backup_plan + 0.10 * s_demand_plan, 2) ELSE NULL END AS soi_planning
+        FROM subs;
+
         CREATE VIEW fct_flights AS
-        SELECT
-            e.*,
-            db.route_day_seq,
-            db.prior_scheduled_count,
-            db.weighted_displacement_hist,
-            db.remaining_scheduled_backups,
-            db.remaining_performed_backups,
-            NULL AS soi_historical,
-            NULL AS soi_planning
-        FROM int_flight_estimates e
-        JOIN int_flight_displacements_backups db ON e.flight_id = db.flight_id;
+        SELECT * FROM int_flights_soi_scored;
 
         CREATE VIEW agg_route_month AS
         WITH t100_agg AS (
@@ -762,7 +947,7 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
     repo_root: Path,
     sample_ingested: dict[str, pd.DataFrame],
 ) -> None:
-    """Verify SQLite SQL transformations match Python Phase 2 enrichment and all mart PK/FK invariants."""
+    """Verify SQLite SQL transformations match Python Phase 2/4 enrichment+SOI and all mart PK/FK invariants."""
     cfg = load_config(repo_root=repo_root, sample_mode=True, dry_run=True)
     py_result = enrich_flights(
         otp_df=sample_ingested["otp_marketing_flights"],
@@ -774,7 +959,12 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
         config=cfg,
         raise_on_sanity_failure=False,
     )
-    py_df = py_result.enriched_flights.copy()
+    py_df = score_flights(
+        enriched_df=py_result.enriched_flights,
+        t100_df=sample_ingested["t100_segments"],
+        tsa_df=sample_ingested["tsa_daily_throughput"],
+        config=cfg,
+    )
     py_df["flight_date_str"] = py_df["flight_date"].astype(str).str.slice(0, 10)
 
     conn = _build_sample_sqlite_db(repo_root, sample_ingested)
@@ -791,7 +981,7 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
             pq_df = pd.read_parquet(sample_parquet)
             assert len(pq_df) == len(sql_fct)
 
-        # Merge on natural flight grain and verify exact parity across aircraft, LF, and estimates
+        # Merge on natural flight grain and verify exact parity across aircraft, LF, estimates, and SOI
         merged = py_df.merge(
             sql_fct,
             left_on=[
@@ -821,6 +1011,7 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
             "fleet_subtype",
             "bts_aircraft_type",
             "lf_source",
+            "holiday_name",
         ):
             assert (
                 merged[f"{col}_py"].fillna("<NA>") == merged[f"{col}_sql"].fillna("<NA>")
@@ -837,6 +1028,14 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
             merged["is_shared_regional_spoke_py"].astype(int)
             == merged["is_shared_regional_spoke_sql"].astype(int)
         ).all()
+        assert (
+            merged["is_holiday_window_py"].astype(int)
+            == merged["is_holiday_window_sql"].astype(int)
+        ).all()
+        assert (
+            merged["prior_strict_scheduled_count_py"].astype(int)
+            == merged["prior_strict_scheduled_count_sql"].astype(int)
+        ).all()
 
         assert np.allclose(
             merged["est_load_factor_py"],
@@ -848,6 +1047,13 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
         assert np.allclose(
             merged["tsa_demand_multiplier_py"],
             merged["tsa_demand_multiplier_sql"],
+            rtol=1e-9,
+            atol=1e-9,
+            equal_nan=True,
+        )
+        assert np.allclose(
+            merged["tsa_ratio_year_py"],
+            merged["tsa_ratio_year_sql"],
             rtol=1e-9,
             atol=1e-9,
             equal_nan=True,
@@ -889,9 +1095,35 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
         assert merged.loc[~has_seats, "est_passengers_sql"].isna().all()
         assert merged.loc[~has_seats, "est_open_seats_sql"].isna().all()
 
-        # Phase 3 typed NULL placeholders and prep metrics
-        assert sql_fct["soi_historical"].isna().all()
-        assert sql_fct["soi_planning"].isna().all()
+        # Phase 4 SOI Python <-> SQL parity (with small tolerance only for 0.5-seat rounding ties)
+        for col in (
+            "weighted_displacement_hist",
+            "s_disp_hist",
+            "s_backup_hist",
+            "s_demand_hist",
+            "s_disp_plan",
+            "s_backup_plan",
+            "s_demand_plan",
+        ):
+            assert np.allclose(
+                merged[f"{col}_py"].astype(float),
+                merged[f"{col}_sql"].astype(float),
+                rtol=1e-7,
+                atol=1e-6,
+                equal_nan=True,
+            ), f"Parity mismatch in {col}"
+
+        for col in ("s_open_hist", "soi_historical", "s_open_plan", "soi_planning"):
+            py_v = merged[f"{col}_py"].astype(float)
+            sql_v = merged[f"{col}_sql"].astype(float)
+            assert (py_v.isna() == sql_v.isna()).all(), f"Nullability mismatch in {col}"
+            non_na = py_v.notna()
+            if non_na.any():
+                assert (py_v[non_na] - sql_v[non_na]).abs().max() <= 1.5
+
+        assert sql_fct.loc[sql_fct["year"] == 2019, "soi_planning"].isna().all()
+        assert sql_fct.loc[sql_fct["year"] >= 2023, "soi_planning"].notna().any()
+        assert sql_fct.loc[sql_fct["is_cancelled"] == 0, "soi_historical"].notna().all()
         assert (
             sql_fct["remaining_scheduled_backups"] >= sql_fct["remaining_performed_backups"]
         ).all()

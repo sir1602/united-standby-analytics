@@ -1,0 +1,604 @@
+{
+  "metadata": {
+    "hub": "ORD",
+    "years": [
+      2019,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "sample_mode": false,
+    "total_flights": 830941,
+    "performed_flights": 814847,
+    "cancelled_flights": 16094,
+    "generated_at_utc": "2026-11-17T19:40:52Z",
+    "weights": {
+      "open_seats": 0.5000000000000001,
+      "displacement_pressure": 0.20000000000000004,
+      "backup_options": 0.20000000000000004,
+      "day_holiday_demand": 0.10000000000000002
+    },
+    "hyperparameters": {
+      "open_seats_abs_cap": 25.0,
+      "open_seats_pct_cap": 0.3,
+      "open_seats_abs_weight": 0.5,
+      "disp_diversion_weight": 0.5,
+      "disp_decay_base": 0.75,
+      "disp_hist_cap": 2.0,
+      "disp_plan_prior_factor": 0.65,
+      "disp_plan_cap": 0.25,
+      "disp_plan_min_obs": 5,
+      "backup_max_flights": 6,
+      "demand_holiday_adder": 0.1,
+      "demand_ratio_min": 0.65,
+      "demand_ratio_max": 1.35
+    }
+  },
+  "coverage_and_invariants": {
+    "by_year": {
+      "2019": {
+        "total_flights": 199882,
+        "performed_flights": 194127,
+        "cancelled_flights": 5755,
+        "soi_historical_scored": 194127,
+        "soi_planning_scored": 0
+      },
+      "2023": {
+        "total_flights": 151447,
+        "performed_flights": 149486,
+        "cancelled_flights": 1961,
+        "soi_historical_scored": 149486,
+        "soi_planning_scored": 149077
+      },
+      "2024": {
+        "total_flights": 161074,
+        "performed_flights": 158869,
+        "cancelled_flights": 2205,
+        "soi_historical_scored": 158869,
+        "soi_planning_scored": 160806
+      },
+      "2025": {
+        "total_flights": 181927,
+        "performed_flights": 179482,
+        "cancelled_flights": 2445,
+        "soi_historical_scored": 179482,
+        "soi_planning_scored": 180881
+      },
+      "2026": {
+        "total_flights": 136611,
+        "performed_flights": 132883,
+        "cancelled_flights": 3728,
+        "soi_historical_scored": 132883,
+        "soi_planning_scored": 136074
+      }
+    },
+    "min_year": 2019,
+    "min_year_soi_planning_non_null": 0,
+    "sc5_missing_t100_null_invariant": {
+      "check_id": "SC-5",
+      "name": "Missing T-100 Null Invariant (Zero Silent Imputation)",
+      "status": "PASS",
+      "message": "Checked 0 unmatched T-100 row(s); silent imputation violations=0",
+      "details": {
+        "unmatched_t100_rows": 0,
+        "violations_by_column": {},
+        "total_violations": 0
+      }
+    },
+    "soi_bounds_check": {
+      "check_id": "SOI-BOUNDS",
+      "name": "Standby Opportunity Index [0, 100] Bounds",
+      "status": "PASS",
+      "message": "Checked 10 SOI score/sub-score columns; out-of-bounds violations=0",
+      "details": {
+        "checked_columns": 10,
+        "violations_by_column": {},
+        "total_violations": 0
+      }
+    },
+    "soi_historical_distribution": {
+      "n": 814847,
+      "min": 4.58,
+      "p10": 40.53,
+      "p25": 49.62,
+      "median": 61.79,
+      "mean": 61.7269,
+      "p75": 74.03,
+      "p90": 83.02,
+      "max": 100.0,
+      "std": 15.9864
+    },
+    "soi_planning_distribution": {
+      "n": 626838,
+      "min": 2.04,
+      "p10": 37.61,
+      "p25": 46.77,
+      "median": 57.97,
+      "mean": 58.0863,
+      "p75": 69.74,
+      "p90": 78.97,
+      "max": 98.2,
+      "std": 15.6458
+    }
+  },
+  "pillar_1_time_based_backtest": {
+    "status": "EVALUATED",
+    "fixed_holdout": {
+      "eval_total_flights": 318538,
+      "planning_scored_flights": 316039,
+      "planning_coverage_pct": 0.992155,
+      "paired_flights": 309930,
+      "spearman_rho": 0.653,
+      "spearman_pvalue": 0.0,
+      "top_decile_hit_rate": 0.5312,
+      "top_decile_lift": 5.3124,
+      "bottom_decile_hit_rate": 0.3891,
+      "bottom_decile_lift": 3.8913,
+      "mae": 11.458,
+      "rmse": 14.6787,
+      "mean_planning": 57.7514,
+      "mean_historical": 64.5872,
+      "train_years": [
+        2019,
+        2023,
+        2024
+      ],
+      "eval_years": [
+        2025,
+        2026
+      ]
+    },
+    "expanding_walk_forward": {
+      "by_year": {
+        "2023": {
+          "eval_total_flights": 151447,
+          "planning_scored_flights": 149077,
+          "planning_coverage_pct": 0.984351,
+          "paired_flights": 147149,
+          "spearman_rho": 0.5645,
+          "spearman_pvalue": 0.0,
+          "top_decile_hit_rate": 0.5155,
+          "top_decile_lift": 5.1551,
+          "bottom_decile_hit_rate": 0.3468,
+          "bottom_decile_lift": 3.4676,
+          "mae": 11.2936,
+          "rmse": 14.6079,
+          "mean_planning": 58.8035,
+          "mean_historical": 58.4434,
+          "train_years": [
+            2019
+          ]
+        },
+        "2024": {
+          "eval_total_flights": 161074,
+          "planning_scored_flights": 160806,
+          "planning_coverage_pct": 0.998336,
+          "paired_flights": 158605,
+          "spearman_rho": 0.661,
+          "spearman_pvalue": 0.0,
+          "top_decile_hit_rate": 0.5693,
+          "top_decile_lift": 5.6925,
+          "bottom_decile_hit_rate": 0.4092,
+          "bottom_decile_lift": 4.0919,
+          "mae": 9.9774,
+          "rmse": 13.1024,
+          "mean_planning": 57.6527,
+          "mean_historical": 60.0118,
+          "train_years": [
+            2019,
+            2023
+          ]
+        },
+        "2025": {
+          "eval_total_flights": 181927,
+          "planning_scored_flights": 180881,
+          "planning_coverage_pct": 0.99425,
+          "paired_flights": 178453,
+          "spearman_rho": 0.6877,
+          "spearman_pvalue": 0.0,
+          "top_decile_hit_rate": 0.5533,
+          "top_decile_lift": 5.5333,
+          "bottom_decile_hit_rate": 0.4208,
+          "bottom_decile_lift": 4.2075,
+          "mae": 10.3823,
+          "rmse": 13.4351,
+          "mean_planning": 58.0,
+          "mean_historical": 62.9761,
+          "train_years": [
+            2019,
+            2023,
+            2024
+          ]
+        },
+        "2026": {
+          "eval_total_flights": 136611,
+          "planning_scored_flights": 136074,
+          "planning_coverage_pct": 0.996069,
+          "paired_flights": 132357,
+          "spearman_rho": 0.6543,
+          "spearman_pvalue": 0.0,
+          "top_decile_hit_rate": 0.5463,
+          "top_decile_lift": 5.4634,
+          "bottom_decile_hit_rate": 0.378,
+          "bottom_decile_lift": 3.7805,
+          "mae": 12.009,
+          "rmse": 15.2117,
+          "mean_planning": 58.2655,
+          "mean_historical": 66.7497,
+          "train_years": [
+            2019,
+            2023,
+            2024,
+            2025
+          ]
+        }
+      },
+      "combined": {
+        "eval_total_flights": 631059,
+        "planning_scored_flights": 626838,
+        "planning_coverage_pct": 0.993311,
+        "paired_flights": 616564,
+        "spearman_rho": 0.6306,
+        "spearman_pvalue": 0.0,
+        "top_decile_hit_rate": 0.5311,
+        "top_decile_lift": 5.3105,
+        "bottom_decile_hit_rate": 0.3837,
+        "bottom_decile_lift": 3.8366,
+        "mae": 10.8448,
+        "rmse": 14.0359,
+        "mean_planning": 58.1594,
+        "mean_historical": 61.9419,
+        "eval_years": [
+          2023,
+          2024,
+          2025,
+          2026
+        ]
+      }
+    },
+    "methodology_caveat": "Both soi_planning and soi_historical use BTS T-100 monthly load factors as their capacity baseline because public datasets do not contain flight-level gate standby clearance outcomes. Therefore, time-based backtesting measures temporal consistency between advance-planning and post-hoc proxies rather than ground-truth non-rev boarding accuracy."
+  },
+  "pillar_2_face_validity": {
+    "status": "EVALUATED",
+    "soi_historical": {
+      "late_jan_midweek": {
+        "n": 10109,
+        "mean": 76.9894,
+        "median": 78.12,
+        "std": 12.0249,
+        "p25": 69.13,
+        "p75": 85.9,
+        "mean_s_open_hist": 80.9268,
+        "mean_s_disp_hist": 97.5219,
+        "mean_s_backup_hist": 40.5286,
+        "mean_s_demand_hist": 89.1586
+      },
+      "all_flights_baseline": {
+        "n": 814847,
+        "mean": 61.7269,
+        "median": 61.79,
+        "std": 15.9864,
+        "p25": 49.62,
+        "p75": 74.03,
+        "mean_s_open_hist": 56.5325,
+        "mean_s_disp_hist": 99.1594,
+        "mean_s_backup_hist": 45.0046,
+        "mean_s_demand_hist": 46.2783
+      },
+      "spring_break": {
+        "n": 40393,
+        "mean": 59.317,
+        "median": 59.56,
+        "std": 14.568,
+        "p25": 48.66,
+        "p75": 70.69,
+        "mean_s_open_hist": 54.8732,
+        "mean_s_disp_hist": 99.3031,
+        "mean_s_backup_hist": 44.5502,
+        "mean_s_demand_hist": 31.0977
+      },
+      "christmas_peak": {
+        "n": 20278,
+        "mean": 51.7826,
+        "median": 50.69,
+        "std": 15.2917,
+        "p25": 40.32,
+        "p75": 62.96,
+        "mean_s_open_hist": 41.9365,
+        "mean_s_disp_hist": 99.6101,
+        "mean_s_backup_hist": 42.4323,
+        "mean_s_demand_hist": 24.058
+      },
+      "thanksgiving_sunday": {
+        "n": 2109,
+        "mean": 46.3913,
+        "median": 43.33,
+        "std": 15.327,
+        "p25": 34.44,
+        "p75": 57.58,
+        "mean_s_open_hist": 34.0372,
+        "mean_s_disp_hist": 96.5943,
+        "mean_s_backup_hist": 49.8746,
+        "mean_s_demand_hist": 0.7905
+      },
+      "spring_break_full_window": {
+        "n": 69135,
+        "mean": 60.4511,
+        "median": 60.8,
+        "std": 14.8931,
+        "p25": 49.42,
+        "p75": 72.05,
+        "mean_s_open_hist": 56.8286,
+        "mean_s_disp_hist": 98.9735,
+        "mean_s_backup_hist": 44.8106,
+        "mean_s_demand_hist": 32.7996
+      },
+      "christmas_eve_and_day": {
+        "n": 3216,
+        "mean": 65.2149,
+        "median": 65.71,
+        "std": 12.2037,
+        "p25": 56.05,
+        "p75": 74.7125,
+        "mean_s_open_hist": 63.9851,
+        "mean_s_disp_hist": 99.4609,
+        "mean_s_backup_hist": 38.4062,
+        "mean_s_demand_hist": 56.4877
+      },
+      "christmas_peak_excl_eve_day": {
+        "n": 17062,
+        "mean": 49.2507,
+        "median": 47.83,
+        "std": 14.4716,
+        "p25": 38.56,
+        "p75": 59.5,
+        "mean_s_open_hist": 37.7806,
+        "mean_s_disp_hist": 99.6382,
+        "mean_s_backup_hist": 43.1911,
+        "mean_s_demand_hist": 17.9453
+      }
+    },
+    "soi_planning": {
+      "late_jan_midweek": {
+        "n": 7936,
+        "mean": 67.3268,
+        "median": 68.685,
+        "std": 13.8888,
+        "p25": 58.215,
+        "p75": 77.31,
+        "mean_s_open_plan": 81.7198,
+        "mean_s_disp_plan": 48.49,
+        "mean_s_backup_plan": 40.4876,
+        "mean_s_demand_plan": 86.7128
+      },
+      "all_flights_baseline": {
+        "n": 626838,
+        "mean": 58.0863,
+        "median": 57.97,
+        "std": 15.6458,
+        "p25": 46.77,
+        "p75": 69.74,
+        "mean_s_open_plan": 56.5126,
+        "mean_s_disp_plan": 80.6858,
+        "mean_s_backup_plan": 45.2308,
+        "mean_s_demand_plan": 46.4673
+      },
+      "spring_break": {
+        "n": 31724,
+        "mean": 57.5441,
+        "median": 57.39,
+        "std": 14.1073,
+        "p25": 47.44,
+        "p75": 67.86,
+        "mean_s_open_plan": 55.2162,
+        "mean_s_disp_plan": 88.7934,
+        "mean_s_backup_plan": 44.6019,
+        "mean_s_demand_plan": 32.5694
+      },
+      "christmas_peak": {
+        "n": 14514,
+        "mean": 53.6995,
+        "median": 52.99,
+        "std": 14.7801,
+        "p25": 43.23,
+        "p75": 64.29,
+        "mean_s_open_plan": 47.2222,
+        "mean_s_disp_plan": 94.7704,
+        "mean_s_backup_plan": 42.3503,
+        "mean_s_demand_plan": 26.6433
+      },
+      "thanksgiving_sunday": {
+        "n": 1547,
+        "mean": 55.1938,
+        "median": 55.07,
+        "std": 15.4676,
+        "p25": 44.085,
+        "p75": 66.16,
+        "mean_s_open_plan": 51.1549,
+        "mean_s_disp_plan": 88.4361,
+        "mean_s_backup_plan": 49.9532,
+        "mean_s_demand_plan": 19.3842
+      },
+      "spring_break_full_window": {
+        "n": 54657,
+        "mean": 57.8939,
+        "median": 57.8,
+        "std": 14.4144,
+        "p25": 47.55,
+        "p75": 68.53,
+        "mean_s_open_plan": 56.5222,
+        "mean_s_disp_plan": 86.2195,
+        "mean_s_backup_plan": 45.0255,
+        "mean_s_demand_plan": 33.8375
+      },
+      "christmas_eve_and_day": {
+        "n": 2322,
+        "mean": 53.1484,
+        "median": 52.595,
+        "std": 14.3502,
+        "p25": 42.96,
+        "p75": 63.545,
+        "mean_s_open_plan": 47.2346,
+        "mean_s_disp_plan": 95.0692,
+        "mean_s_backup_plan": 38.6878,
+        "mean_s_demand_plan": 27.7971
+      },
+      "christmas_peak_excl_eve_day": {
+        "n": 12192,
+        "mean": 53.8045,
+        "median": 53.03,
+        "std": 14.8588,
+        "p25": 43.31,
+        "p75": 64.47,
+        "mean_s_open_plan": 47.2198,
+        "mean_s_disp_plan": 94.7134,
+        "mean_s_backup_plan": 43.0478,
+        "mean_s_demand_plan": 26.4235
+      }
+    },
+    "statistical_separation_tests": {
+      "late_jan_vs_thanksgiving_sunday": {
+        "soi_historical": {
+          "delta_mean": 30.598,
+          "welch_t_stat": 86.3057,
+          "welch_p_value": 0.0,
+          "mann_whitney_u": 19845168.0,
+          "mann_whitney_p_value": 0.0
+        },
+        "soi_planning": {
+          "delta_mean": 12.1331,
+          "welch_t_stat": 28.681,
+          "welch_p_value": 1.657e-152,
+          "mann_whitney_u": 8831636.5,
+          "mann_whitney_p_value": 6.986e-165
+        }
+      },
+      "late_jan_vs_christmas_peak": {
+        "soi_historical": {
+          "delta_mean": 25.2068,
+          "welch_t_stat": 156.8229,
+          "welch_p_value": 0.0,
+          "mann_whitney_u": 183361835.0,
+          "mann_whitney_p_value": 0.0
+        },
+        "soi_planning": {
+          "delta_mean": 13.6273,
+          "welch_t_stat": 68.6902,
+          "welch_p_value": 0.0,
+          "mann_whitney_u": 86307638.5,
+          "mann_whitney_p_value": 0.0
+        }
+      },
+      "late_jan_vs_spring_break": {
+        "soi_historical": {
+          "delta_mean": 17.6723,
+          "welch_t_stat": 126.3663,
+          "welch_p_value": 0.0,
+          "mann_whitney_u": 334784221.0,
+          "mann_whitney_p_value": 0.0
+        },
+        "soi_planning": {
+          "delta_mean": 9.7827,
+          "welch_t_stat": 55.9423,
+          "welch_p_value": 0.0,
+          "mann_whitney_u": 173932241.0,
+          "mann_whitney_p_value": 0.0
+        }
+      }
+    },
+    "nuances": [
+      "Thanksgiving Sunday falls in December in 2019 (2019-12-01) and 2024 (2024-12-01); window lookup uses year-anchored 4th Thursday of November + 3 days without a month == 11 restriction.",
+      "In soi_planning, TSA (month, iso_dow, is_holiday_window) prior averaging blends Dec 1 Thanksgiving Sunday with Dec 22/29 holiday Sundays and blends Jan 15-31 troughs with Jan 1-14 holiday return weeks, narrowing soi_planning trough-vs-peak separation compared to soi_historical while keeping Welch p < 1e-100.",
+      "Christmas Eve/Day (Dec 24-25) flies lighter loads than Dec 20-23 & Dec 26-30, creating a bimodal sub-regime within the Dec 20-30 holiday window.",
+      "2019 flights have soi_planning = NULL (no prior training year), and 2026 data ends 2026-08-31 (covered in Jan/Mar windows, absent in Nov/Dec)."
+    ]
+  },
+  "pillar_3_weight_sensitivity": {
+    "status": "EVALUATED",
+    "n_scored_flights": 814847,
+    "schemes": {
+      "baseline": {
+        "weights": {
+          "open_seats": 0.5,
+          "displacement_pressure": 0.2,
+          "backup_options": 0.2,
+          "day_holiday_demand": 0.1
+        },
+        "mean_score": 61.7269,
+        "std_score": 15.9864,
+        "spearman_rho_vs_baseline": 1.0,
+        "top10_overlap_pct": 100.0,
+        "bottom10_overlap_pct": 100.0
+      },
+      "seat_heavy": {
+        "weights": {
+          "open_seats": 0.65,
+          "displacement_pressure": 0.15,
+          "backup_options": 0.15,
+          "day_holiday_demand": 0.05
+        },
+        "mean_score": 60.6846,
+        "std_score": 18.9786,
+        "spearman_rho_vs_baseline": 0.9833,
+        "top10_overlap_pct": 87.46,
+        "bottom10_overlap_pct": 87.34
+      },
+      "disruption_heavy": {
+        "weights": {
+          "open_seats": 0.4,
+          "displacement_pressure": 0.3,
+          "backup_options": 0.2,
+          "day_holiday_demand": 0.1
+        },
+        "mean_score": 65.9896,
+        "std_score": 13.6247,
+        "spearman_rho_vs_baseline": 0.994,
+        "top10_overlap_pct": 94.28,
+        "bottom10_overlap_pct": 92.36
+      },
+      "backup_heavy": {
+        "weights": {
+          "open_seats": 0.4,
+          "displacement_pressure": 0.15,
+          "backup_options": 0.35,
+          "day_holiday_demand": 0.1
+        },
+        "mean_score": 57.8663,
+        "std_score": 16.5011,
+        "spearman_rho_vs_baseline": 0.9222,
+        "top10_overlap_pct": 80.7,
+        "bottom10_overlap_pct": 72.99
+      },
+      "equal_weights": {
+        "weights": {
+          "open_seats": 0.25,
+          "displacement_pressure": 0.25,
+          "backup_options": 0.25,
+          "day_holiday_demand": 0.25
+        },
+        "mean_score": 61.7437,
+        "std_score": 12.7381,
+        "spearman_rho_vs_baseline": 0.901,
+        "top10_overlap_pct": 77.02,
+        "bottom10_overlap_pct": 72.45
+      },
+      "demand_heavy": {
+        "weights": {
+          "open_seats": 0.4,
+          "displacement_pressure": 0.15,
+          "backup_options": 0.15,
+          "day_holiday_demand": 0.3
+        },
+        "mean_score": 58.1211,
+        "std_score": 14.9405,
+        "spearman_rho_vs_baseline": 0.9665,
+        "top10_overlap_pct": 75.37,
+        "bottom10_overlap_pct": 84.28
+      }
+    },
+    "ranking_stability_passed": true
+  },
+  "passed": true,
+  "gate_failures": []
+}

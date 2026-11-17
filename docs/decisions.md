@@ -1,10 +1,10 @@
 # Technical Decisions & Assumptions Log (`docs/decisions.md`)
 
-Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, and the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**.
+Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**, and the **6 Phase 4 Standby Opportunity Index & validation decisions (`D-29` through `D-34`)**.
 
 ---
 
-## Summary Table (`D-01` – `D-28`)
+## Summary Table (`D-01` – `D-34`)
 
 | ID | Category | Decision Title | Choice Made | Status |
 |---|---|---|---|---|
@@ -36,6 +36,12 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-26** | Dimensional Modeling (Phase 3) | Conformed Dimension Primary Keys (`dim_airport`, `dim_carrier`, `dim_aircraft`) | Key `dim_airport` on `airport_code` (avoids `airport_id=14027` `PBI`/`DJT` collision), `dim_carrier` 1:1 on `op_carrier` (aggregating `L_CARRIER_HISTORY`), and `dim_aircraft` 1:1 on `tail_num` across multi-carrier regional tails | Phase 3 dbt Marts |
 | **D-27** | Marts & Scope (Phase 3) | `fct_flights` Partitioning, `agg_route_month` Domestic+Intl Scope & Full-Refresh Tables | Materialize `fct_flights` (`DAY` partition on `flight_date`, clustered `origin, dest, op_carrier`) and `agg_route_month` (UA-family Domestic `DU/DF` + Intl `IU/IF` with `data_granularity`) as `table`s (offline `dbt compile` safe) | Phase 3 dbt Marts |
 | **D-28** | Operational SQL Logic (Phase 3) | Deterministic Same-Day Tie-Breaking, Strict Backup Inequality & US Holiday Window Macro | Order route-day flights by `(crs_dep_time ASC, is_cancelled DESC, flight_num_mkt ASC, op_carrier ASC)`, use strict `crs_dep_time > current` for backups, and encode 6 deterministic US holiday windows in `holiday_calendar.sql` | Phase 3 dbt Marts |
+| **D-29** | SOI Architecture (Phase 4) | 1:1 Python & dbt BigQuery SQL Scoring Parity | Implement identical `soi_historical`, `soi_planning`, and all 8 sub-scores in `src/standby/scoring/` and `dbt/models/intermediate/int_flights_soi_scored.sql` → `fct_flights`, verified via SQLite parity & singular tests | Phase 4 SOI & Validation |
+| **D-30** | Leakage Prevention (Phase 4) | Expanding `train.year < eval.year` Walk-Forward Priors & `2019 = NULL` | Fit modal `(seats_config, bts_aircraft_type)` (4-tier), T-100 LF (5-tier), disruption rate $\hat{q}$ (4-tier, `min_obs=5`), and TSA ratios (4-tier) strictly on `year < eval_year`; leave `2019` `soi_planning = NULL` | Phase 4 SOI & Validation |
+| **D-31** | Signal Calibration (Phase 4) | Dual TSA Normalization (`tsa_ratio_month` vs. `tsa_ratio_year`) & Year-Anchored Holiday Windows | Use `tsa_ratio_month` inside `m_tsa` (`S_open`), `tsa_ratio_year` inside `S_demand` (preserving cross-month holiday peaks), and year-anchored Thanksgiving Sunday (`+3d` without `month == 11`, capturing `2019-12-01` & `2024-12-01`) | Phase 4 SOI & Validation |
+| **D-32** | Null & Eligibility Gates (Phase 4) | `SC-5` Zero Imputation, Cancelled `soi_historical = NULL`, and Planning Survivorship | Enforce `NULL` on both indices when T-100 is unavailable/unmatched (`SC-5`), `NULL` on `soi_historical` when `is_cancelled`, and score cancelled flights in `soi_planning` to avoid survivorship bias | Phase 4 SOI & Validation |
+| **D-33** | Validation Suite (Phase 4) | Three-Pillar Section 6 Validation Gates (`standby validate-index`) | Gate full runs on Fixed Holdout + Expanding Walk-Forward ($\rho \ge 0.55$, lift $\ge 3.0\times$, coverage $\ge 95\%$), monotonic Face-Validity ordering + Welch/Mann-Whitney separation, and Weight Sensitivity ($\rho \ge 0.85$), outputting `docs/phase4_validation_summary.json` | Phase 4 SOI & Validation |
+| **D-34** | Package Architecture (Phase 4) | Shared `DEFAULT_UA_FAMILY_CARRIERS` in `standby.config` & Lazy Confidence Tagging | Define `DEFAULT_UA_FAMILY_CARRIERS` in `standby.config` and lazy-import `tag_dataframe_confidence_tiers` in `score_flights()` to guarantee cycle-free imports across `scoring`, `validation`, and `enrichment` | Phase 4 SOI & Validation |
 
 ---
 
@@ -216,4 +222,39 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 - **Context:** Eight `(origin, dest, flight_date, crs_dep_time)` cells (`18` rows) in the full dataset contain multiple departures scheduled at the exact same minute (including cancelled + recovery flights), and Phase 4 SOI requires shared, leakage-free displacement/backup prep metrics and holiday calendar definitions across Python and BigQuery SQL.
 - **Decision:** Order route-day flights deterministically by `(crs_dep_time ASC, is_cancelled DESC, flight_num_mkt ASC, op_carrier ASC)`, compute `weighted_displacement_hist` with intermediate-flight absorption $0.75^{\Delta k}$ ($\Delta k = \text{seq}_i - \text{seq}_j - 1$), count `remaining_scheduled_backups` and `remaining_performed_backups` using strict `j.crs_dep_time > i.crs_dep_time` (no self-count on tied times), and define 6 deterministic US holiday travel windows in `dbt/macros/holiday_calendar.sql` (`Christmas / New Year` Dec 20–Jan 3, `Thanksgiving` Wed–Mon, `Memorial Day` Fri–Tue, `Independence Day` Jul 1–7, `Labor Day` Fri–Tue, `Spring Break` Mar 10–Apr 7).
 - **Rationale & Implications:** Guarantees bit-for-bit parity between Phase 3 SQL marts and Phase 4 Python SOI scoring.
+
+---
+
+## Phase 4 Standby Opportunity Index & Validation Decisions (`D-29` – `D-34`)
+
+### D-29: 1:1 Python & dbt BigQuery SQL Scoring Parity
+- **Context:** Phase 4 requires both Python (`src/standby/scoring/`) and BigQuery `dbt` (`int_flights_soi_scored.sql` → `fct_flights.sql`) to expose `soi_historical`, `soi_planning`, and all 8 sub-scores (`s_open_*`, `s_disp_*`, `s_backup_*`, `s_demand_*`) with identical business rules.
+- **Decision:** Mirror the Python scoring equations, constants (`config/standby.yaml` / `dbt/dbt_project.yml` vars), deterministic tie-breakers, and `SC-5` eligibility gates 1:1 in `dbt/models/intermediate/int_flights_soi_scored.sql`, and verify equivalence in `tests/test_dbt_project.py` (SQLite parity test) and `dbt/tests/assert_soi_leakage_and_bounds.sql`.
+- **Rationale & Implications:** Ensures BI extracts from BigQuery marts match Python validation metrics (`docs/phase4_validation_summary.json`) up to the documented $\pm 1$ seat banker's vs. half-away-from-zero rounding tolerance on exact `.5` passenger ties.
+
+### D-30: Expanding `train.year < eval.year` Walk-Forward Priors & `2019 = NULL`
+- **Context:** Evaluating `soi_planning` without future/same-year leakage requires strict temporal isolation of aircraft seat configurations, T-100 load factors, disruption rates, and TSA demand ratios.
+- **Decision:** Fit all 4 planning prior hierarchies (`4-tier` modal `(seats_config, bts_aircraft_type)` with `seats_config ASC, bts_aircraft_type ASC` tie-breaker; `5-tier` T-100 LF; `4-tier` disruption rate $\hat{q}$ with `disp_plan_min_obs = 5` on Tiers 1–2; `4-tier` TSA ratios) strictly over `train.year < eval.year`. Leave `2019` (`199,882` flights, the minimum year) strictly `NULL` on `soi_planning`.
+- **Rationale & Implications:** Verified via adversarial mutation testing (`test_soi_planning_strict_zero_future_leakage_adversarial`) and SQLite/dbt compilation checks (`f.year < ey.eval_year`), achieving `99.33%` planning coverage across `2023–2026`.
+
+### D-31: Dual TSA Normalization (`tsa_ratio_month` vs. `tsa_ratio_year`) & Year-Anchored Holiday Windows
+- **Context:** `m_tsa` in Phase 2 uses `tsa_ratio_month` to capture intraday/day-of-week variance within a month, whereas `S_demand` must distinguish peak holiday months (Thanksgiving/Christmas) from off-peak months (late January). Additionally, Thanksgiving Sunday falls on December 1 in both `2019` (`2019-12-01`) and `2024` (`2024-12-01`).
+- **Decision:** Keep `tsa_ratio_month` for `m_tsa` (`est_lf_adjusted` / `S_open`), use annual `tsa_ratio_year` for `S_demand`, and compute the Thanksgiving window strictly as `thanksgiving_date(year) - 1 day .. + 4 days` without a `month == 11` filter in both `src/standby/scoring/holidays.py` and `dbt/macros/holiday_calendar.sql`.
+- **Rationale & Implications:** Preserves full seasonal separation (`late_jan_midweek` `76.99` vs. `thanksgiving_sunday` `46.39` on `soi_historical`, $\Delta = +30.60$, $p \approx 0.0$) and captures all 2019/2024 December Thanksgiving Sunday flights (`n = 2,109`).
+
+### D-32: Null & Eligibility Gates (`SC-5`, Cancelled `soi_historical = NULL`, Planning Survivorship)
+- **Context:** A cancelled flight cannot be boarded post-hoc, whereas an advance planner does not know in advance which scheduled flights will cancel. Meanwhile, `SC-5` forbids silent imputation when T-100 is missing.
+- **Decision:** Enforce `NULL` on both `soi_historical` and `soi_planning` whenever `NOT t100_available OR lf_source = 'UNMATCHED'` (`SC-5`), enforce `NULL` on `soi_historical` whenever `is_cancelled = TRUE` (`814,847 / 814,847` performed flights scored), and score cancelled flights in `soi_planning` (`626,838` flights scored across `2023–2026`).
+- **Rationale & Implications:** Prevents survivorship bias in planning evaluations and guarantees `0` `SC-5` or `[0, 100]` bounds violations.
+
+### D-33: Three-Pillar Section 6 Validation Gates (`standby validate-index`)
+- **Context:** Because ground-truth gate standby clearance outcomes are unavailable in public data, index quality must be established via temporal consistency, domain face validity, and weight stability.
+- **Decision:** Implement `run_soi_validation` (`python -m standby validate-index`) gating full runs on Fixed Holdout + Expanding Walk-Forward ($\rho \ge 0.55$, top-decile lift $\ge 3.0\times$, coverage $\ge 95\%$), Face-Validity monotonic peak/trough ordering + Welch $p < 10^{-10}$, and Weight Sensitivity ($\rho \ge 0.85$ across core alternative schemes), persisting full metrics to `docs/phase4_validation_summary.json` and documenting all findings and limitations in `docs/index_methodology.md`.
+- **Rationale & Implications:** Full `830,941`-flight validation passes every gate (`holdout_rho = 0.6530`, `walk_forward_rho = 0.6306`, `top_decile_lift = 5.31x`, `min sensitivity rho = 0.9010`).
+
+### D-34: Cycle-Free Package Imports (`DEFAULT_UA_FAMILY_CARRIERS` in `standby.config` & Lazy Confidence Tagging)
+- **Context:** `standby.validation.sanity` and `standby.scoring.soi` both referenced `DEFAULT_UA_FAMILY_CARRIERS` from `standby.enrichment.load_factor`, while `standby.enrichment.pipeline` imported `standby.validation.sanity` and `standby.validation.soi_validation` imported `standby.scoring.soi` — creating an import-order circular dependency.
+- **Decision:** Define `DEFAULT_UA_FAMILY_CARRIERS` in `src/standby/config.py` (re-exported by `load_factor.py` for compatibility) and lazy-import `tag_dataframe_confidence_tiers` inside `score_flights()`.
+- **Rationale & Implications:** Guarantees `standby.scoring`, `standby.validation`, and `standby.enrichment` can be imported in any order in a fresh Python interpreter.
+
 

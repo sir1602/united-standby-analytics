@@ -163,6 +163,17 @@ models:
         data_tests:
           - unique
           - not_null
+      - name: iso_dow
+        description: "ISO day of week (1=Monday .. 7=Sunday)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: is_holiday_window
+        description: "True when date_day falls inside the 6-window US holiday calendar."
+        data_tests:
+          - not_null
       - name: tsa_throughput
         description: "Daily national checkpoint volume."
         data_tests:

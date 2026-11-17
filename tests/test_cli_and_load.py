@@ -179,9 +179,60 @@ def test_cli_verify_manifest_ingest_load_raw_and_run_sample(
         "est_passengers_adjusted",
         "est_open_seats_adjusted",
         "record_confidence_summary",
+        "is_holiday_window",
+        "holiday_name",
+        "tsa_ratio_year",
+        "prior_strict_scheduled_count",
+        "weighted_displacement_hist",
+        "remaining_scheduled_backups",
+        "remaining_performed_backups",
+        "s_open_hist",
+        "s_disp_hist",
+        "s_backup_hist",
+        "s_demand_hist",
+        "soi_historical",
+        "s_open_plan",
+        "s_disp_plan",
+        "s_backup_plan",
+        "s_demand_plan",
+        "soi_planning",
     ):
-        assert col in enriched_schema.names, f"Missing enriched column {col} in Parquet"
+        assert col in enriched_schema.names, f"Missing enriched/SOI column {col} in Parquet"
+    assert len(enriched_schema.names) == 71
     assert str(enriched_schema.field("flight_date").type) == "date32[day]"
+
+    res_score = runner.invoke(
+        main,
+        [
+            "score",
+            "--hub",
+            "ORD",
+            "--years",
+            "2019,2023-2026",
+            "--sample",
+            "--from-processed",
+        ],
+    )
+    assert res_score.exit_code == 0, res_score.output
+    assert "SCORING PASSED: flights=80" in res_score.output
+
+    val_summary = tmp_path / "sample_phase4_validation.json"
+    res_validate = runner.invoke(
+        main,
+        [
+            "validate-index",
+            "--hub",
+            "ORD",
+            "--years",
+            "2019,2023-2026",
+            "--sample",
+            "--summary-path",
+            str(val_summary),
+        ],
+    )
+    assert res_validate.exit_code == 0, res_validate.output
+    assert "SOI VALIDATION PASSED: flights=80" in res_validate.output
+    assert val_summary.is_file()
 
 
 def test_parse_years_arg_and_load_config_rejects_invalid_and_empty_years(repo_root: Path) -> None:

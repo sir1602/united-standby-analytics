@@ -6,8 +6,8 @@ models:
       Core domestic flight fact mart partitioned by DAY on `flight_date` (NONE expiry)
       and clustered by `origin, dest, op_carrier`. Combines observed BTS OTP actuals,
       3-tier aircraft/seat configurations, 3-tier T-100 monthly load factors, separate
-      modeled TSA/hour-block demand adjustments, and same-day displacement/backup counts.
-      Phase 3 exposes typed NULL placeholders for `soi_historical` and `soi_planning`.
+      modeled TSA/hour-block demand adjustments, same-day displacement/backup counts,
+      and Phase 4 `soi_historical` & leakage-free `soi_planning` scores with sub-scores.
     columns:
       - name: flight_id
         description: "Deterministic primary key (YYYYMMDD|mkt_carrier|flight_num_mkt|origin|dest|crs_dep_time)."
@@ -116,10 +116,82 @@ models:
           - accepted_range:
               min_value: 0
               max_value: 500
+      - name: prior_strict_scheduled_count
+        description: "Leakage-free count of strictly earlier scheduled route-day departures."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      - name: is_holiday_window
+        description: "True when flight_date falls inside one of the 6 US holiday travel windows."
+        data_tests:
+          - not_null
+      - name: holiday_name
+        description: "Name of the matching US holiday travel window, or NULL."
+      - name: tsa_ratio_year
+        description: "Annual-relative daily TSA checkpoint ratio used in S_demand."
+      - name: s_open_hist
+        description: "Historical open-seat component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_disp_hist
+        description: "Historical displacement-pressure component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_backup_hist
+        description: "Historical backup-options component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_demand_hist
+        description: "Historical day/holiday demand component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
       - name: soi_historical
-        description: "Phase 4 Standby Opportunity Index (historical post-hoc variant; typed NULL placeholder in Phase 3)."
+        description: "Phase 4 Standby Opportunity Index (historical post-hoc variant [0, 100]; NULL on cancelled or unmatched T-100)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+          - not_null_where:
+              where_clause: "t100_available and lf_source != 'UNMATCHED' and not is_cancelled and seats_config is not null and tsa_throughput is not null"
+      - name: s_open_plan
+        description: "Leakage-free planning open-seat component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_disp_plan
+        description: "Leakage-free planning displacement-pressure component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_backup_plan
+        description: "Leakage-free planning backup-options component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_demand_plan
+        description: "Leakage-free planning day/holiday demand component sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
       - name: soi_planning
-        description: "Phase 4 Standby Opportunity Index (leakage-free planning variant; typed NULL placeholder in Phase 3)."
+        description: "Phase 4 Standby Opportunity Index (leakage-free planning variant [0, 100]; NULL in 2019 or unmatched T-100)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
 
   - name: agg_route_month
     description: >

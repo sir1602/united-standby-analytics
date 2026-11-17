@@ -59,6 +59,8 @@ select
     date_day,
     year,
     month,
+    mod(extract(dayofweek from date_day) + 5, 7) + 1 as iso_dow,
+    {{ is_holiday_window('date_day') }} as is_holiday_window,
     tsa_throughput,
     tsa_ratio_month,
     least(
