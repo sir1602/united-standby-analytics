@@ -22,7 +22,7 @@ All actual raw files across all 5 sources (`56` monthly BTS Marketing Carrier OT
 
 - **[`docs/phase0_validation_report.md`](docs/phase0_validation_report.md):** Complete Phase 0 Empirical Validation Report (Tables 1–5: dataset inventory & null rates, field verification & Reporting vs. Marketing OTP discrepancy proof, OTP vs. T-100 reconciliation across years/carriers, FAA tail match rate lift from `DEREG.txt`, and 6+3 data quirks with verbatim examples) + End-to-End Architecture & Methodology Proposal (Mermaid diagram, 7-step join keys & 3-tier `lf_source` hierarchy, `soi_historical` & `soi_planning` mathematical equations, strict leakage boundary, and 11 metric limitations).
 - **[`docs/data_acquisition.md`](docs/data_acquisition.md):** Scripted acquisition methods and exact step-by-step manual browser download instructions (URLs, form selections, filters, checkboxes) for all 5 sources + `data/manifest.csv` checksum contract.
-- **[`docs/decisions.md`](docs/decisions.md):** Technical Decisions & Assumptions Log (`D-01` through `D-18`), combining the 13 baseline decisions and 5 empirical Phase 0 technical decisions.
+- **[`docs/decisions.md`](docs/decisions.md):** Technical Decisions & Assumptions Log (`D-01` through `D-23`), combining the 13 baseline decisions, 5 empirical Phase 0 technical decisions, and 5 Phase 2 enrichment decisions.
 - **[`notebooks/00_phase0_validation.ipynb`](notebooks/00_phase0_validation.ipynb):** Executed Jupyter Notebook reproducing every table and empirical statistic in `docs/phase0_validation_report.md` from `data/raw/`.
 
 ---
@@ -63,11 +63,24 @@ united-standby-analytics/
 | Phase | PR | Milestone & Deliverables | Status |
 |---|---|---|---|
 | **Phase 0** | **PR #1** | **Phase 0 Validation Report + Architecture Proposal** (`docs/phase0_validation_report.md`, `docs/data_acquisition.md`, `docs/decisions.md`, `notebooks/00_phase0_validation.ipynb`) — *Stop Gate 1* | **Merged (`main`)** |
-| **Phase 1** | **PR #2** | **Ingestion + Checksummed `data/manifest.csv` + `data/sample/` + `pandera` Schemas + BigQuery `raw` Batch Load + GitHub Actions CI + `dbt parse` Stub** | **Complete (PR #2 Open)** |
-| **Phase 2** | PR #3 | Flight-Level Enrichment + Curated Reference Tables (`reference/`) — *Stop Gate 2* | Planned |
+| **Phase 1** | **PR #2** | **Ingestion + Checksummed `data/manifest.csv` + `data/sample/` + `pandera` Schemas + BigQuery `raw` Batch Load + GitHub Actions CI + `dbt parse` Stub** | **Merged (`main`)** |
+| **Phase 2** | **PR #3** | **Flight-Level Enrichment + Curated Reference Tables (`reference/`) + Section 7 Sanity Checks** — *Stop Gate 2* | **Complete (PR #3 Open)** |
 | **Phase 3** | PR #4 | `dbt Core` (`staging` → `intermediate` → `marts`) + Schema Tests | Planned |
 | **Phase 4** | PR #5 | Standby Opportunity Index (`soi_historical` + `soi_planning`) + Validation Suite — *Stop Gate 3* | Planned |
 | **Phase 5** | PR #6 | Tableau Public Extracts (`exports/tableau/`) + Dashboard Spec + Final README & Data Dictionary | Planned |
+
+---
+
+## Phase 2 Enrichment Deliverables (Stop-Gate 2 Review)
+
+Verified across all **`830,941` `ORD` `UA` flights** (`814,847` performed, `16,094` cancelled; full output in [`docs/phase2_enrichment_summary.json`](docs/phase2_enrichment_summary.json)):
+- **Curated Reference Tables (`reference/`):**
+  - `seat_config.csv`: `31` United Mainline (`21`) & Express (`10`) cabin layouts with `source_url` and `as_of` (`2026-08-31`).
+  - `faa_t100_crosswalk.csv`: `56` `(faa_mfr, faa_model, op_carrier)` rules mapped 100% to `L_AIRCRAFT_TYPE.csv`.
+  - `tail_overrides.csv`: `152` tail-level overrides (`72` mainline multi-config `777-222`/`767-300ER`/`757-200` + `80` historical regional tails).
+- **3-Tier Aircraft Resolution (`src/standby/enrichment/aircraft.py`):** Strict `TAIL_OVERRIDE → FAA_MASTER → FAA_DEREG` lookup with `faa_tc_max_seats >= 20` Stearman collision guard (`9,263` low-seat registry collisions rejected), lifting performed flight resolution from `97.85%` (raw FAA commercial) to **`100.0000%` (`814,847 / 814,847` performed flights; `0` unmatched performed)**.
+- **3-Tier T-100 Load Factor & Adjustments (`load_factor.py`, `calculations.py`):** `98.02%` (`814,497`) resolved at `CARRIER_ROUTE_MONTH_TYPE`, `1.98%` (`16,430`) at `CARRIER_ROUTE_MONTH`, and `14` at `ROUTE_MONTH`, keeping base estimates separate from modeled TSA/hour-block adjustments (`alpha = 0.35`, `[0.80, 1.20]` bounds) and preserving strict `NULL`s when T-100 is unavailable.
+- **Section 7 Automated Sanity Checks (`src/standby/validation/sanity.py`):** All 5 sanity checks (`SC-1`..`SC-5`) pass on the full `830,941`-flight dataset (`0` failures; `SC-3` max T-100 seats/dep diff = `5.68%`; `SC-4` system-wide UA LF = `82.89%`).
 
 ---
 
@@ -98,5 +111,6 @@ make ingest-sample
 .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
 # Other CLI subcommands:
 .venv/bin/python -m standby ingest --hub ORD --years 2019,2023-2026 --sample
+.venv/bin/python -m standby enrich --hub ORD --years 2019,2023-2026 --sample
 .venv/bin/python -m standby load-raw --hub ORD --years 2019,2023-2026 --sample --dry-run
 ```

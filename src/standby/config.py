@@ -33,6 +33,49 @@ class BigQueryConfig:
     tables: dict[str, str]
 
 
+@dataclass(frozen=True)
+class EnrichmentConfig:
+    """Configuration parameters for Phase 2 flight-level enrichment."""
+
+    tsa_damping_alpha: float = 0.35
+    tsa_multiplier_bounds: tuple[float, float] = (0.80, 1.20)
+    min_faa_tc_max_seats: int = 20
+    commercial_mfr_prefixes: tuple[str, ...] = (
+        "BOEING",
+        "AIRBUS",
+        "EMBRAER",
+        "YABORA",
+        "BOMBARDIER",
+        "CANADAIR",
+        "MHI RJ",
+    )
+    dedicated_express_carriers: tuple[str, ...] = ("G7", "EV", "AX", "C5")
+    shared_cpa_express_carriers: tuple[str, ...] = ("OO", "YX", "YV", "ZW")
+    hour_block_multipliers: dict[str, float] = field(
+        default_factory=lambda: {
+            "early": 0.96,
+            "morning": 1.03,
+            "midday": 1.00,
+            "afternoon": 1.02,
+            "evening": 1.04,
+            "late": 0.94,
+        }
+    )
+
+
+@dataclass(frozen=True)
+class SanityCheckConfig:
+    """Thresholds for Section 7 automated sanity checks (`SC-1`..`SC-5`)."""
+
+    departure_reconciliation_tolerance: float = 0.10
+    seats_per_dep_warn_tolerance: float = 0.10
+    seats_per_dep_fail_tolerance: float = 0.15
+    system_lf_warn_bounds: tuple[float, float] = (0.80, 0.86)
+    system_lf_fail_bounds: tuple[float, float] = (0.75, 0.90)
+    sample_lf_fail_bounds: tuple[float, float] = (0.70, 0.92)
+    sample_min_t100_rows: int = 500
+
+
 @dataclass
 class StandbyConfig:
     """Typed pipeline configuration resolved from `config/standby.yaml`."""
@@ -56,6 +99,8 @@ class StandbyConfig:
     hour_blocks: dict[str, HourBlockSpec]
     index_weights: dict[str, float]
     bigquery: BigQueryConfig
+    enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
+    sanity_checks: SanityCheckConfig = field(default_factory=SanityCheckConfig)
     sample_mode: bool = False
     dry_run: bool = False
     raw_yaml: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -93,6 +138,8 @@ class StandbyConfig:
 
     def get_hour_multiplier(self, hour_block: str) -> float:
         """Return the configured load multiplier for a given hour block."""
+        if hour_block in self.enrichment.hour_block_multipliers:
+            return float(self.enrichment.hour_block_multipliers[hour_block])
         spec = self.hour_blocks.get(hour_block)
         return spec.load_multiplier if spec is not None else 1.0
 
@@ -202,6 +249,68 @@ def load_config(
         tables=dict(bq_raw.get("tables", {})),
     )
 
+    enr_raw = raw.get("enrichment", {})
+    default_enr = EnrichmentConfig()
+    tsa_bounds_raw = enr_raw.get("tsa_multiplier_bounds", list(default_enr.tsa_multiplier_bounds))
+    hb_mults_raw = enr_raw.get("hour_block_multipliers")
+    if isinstance(hb_mults_raw, dict):
+        hb_mults = {str(k): float(v) for k, v in hb_mults_raw.items()}
+    else:
+        hb_mults = {name: spec.load_multiplier for name, spec in hour_blocks.items()} or dict(
+            default_enr.hour_block_multipliers
+        )
+
+    enrichment_config = EnrichmentConfig(
+        tsa_damping_alpha=float(enr_raw.get("tsa_damping_alpha", default_enr.tsa_damping_alpha)),
+        tsa_multiplier_bounds=(float(tsa_bounds_raw[0]), float(tsa_bounds_raw[1])),
+        min_faa_tc_max_seats=int(
+            enr_raw.get("min_faa_tc_max_seats", default_enr.min_faa_tc_max_seats)
+        ),
+        commercial_mfr_prefixes=tuple(
+            str(p).strip().upper()
+            for p in enr_raw.get("commercial_mfr_prefixes", default_enr.commercial_mfr_prefixes)
+        ),
+        dedicated_express_carriers=tuple(
+            str(c).strip().upper()
+            for c in enr_raw.get(
+                "dedicated_express_carriers", default_enr.dedicated_express_carriers
+            )
+        ),
+        shared_cpa_express_carriers=tuple(
+            str(c).strip().upper()
+            for c in enr_raw.get(
+                "shared_cpa_express_carriers", default_enr.shared_cpa_express_carriers
+            )
+        ),
+        hour_block_multipliers=hb_mults,
+    )
+
+    sc_raw = raw.get("sanity_checks", {})
+    default_sc = SanityCheckConfig()
+    warn_b = sc_raw.get("system_lf_warn_bounds", list(default_sc.system_lf_warn_bounds))
+    fail_b = sc_raw.get("system_lf_fail_bounds", list(default_sc.system_lf_fail_bounds))
+    samp_b = sc_raw.get("sample_lf_fail_bounds", list(default_sc.sample_lf_fail_bounds))
+    sanity_config = SanityCheckConfig(
+        departure_reconciliation_tolerance=float(
+            sc_raw.get(
+                "departure_reconciliation_tolerance",
+                default_sc.departure_reconciliation_tolerance,
+            )
+        ),
+        seats_per_dep_warn_tolerance=float(
+            sc_raw.get("seats_per_dep_warn_tolerance", default_sc.seats_per_dep_warn_tolerance)
+        ),
+        seats_per_dep_fail_tolerance=float(
+            sc_raw.get("seats_per_dep_fail_tolerance", default_sc.seats_per_dep_fail_tolerance)
+        ),
+        system_lf_warn_bounds=(float(warn_b[0]), float(warn_b[1])),
+        system_lf_fail_bounds=(float(fail_b[0]), float(fail_b[1])),
+        sample_lf_fail_bounds=(float(samp_b[0]), float(samp_b[1])),
+        sample_min_t100_rows=int(
+            sc_raw.get("sample_min_t100_rows", default_sc.sample_min_t100_rows)
+        ),
+    )
+
     return StandbyConfig(
         project_name=str(proj.get("name", "united-standby-analytics")),
         project_version=str(proj.get("version", "0.1.0")),
@@ -223,6 +332,8 @@ def load_config(
         hour_blocks=hour_blocks,
         index_weights={k: float(v) for k, v in weights.items()},
         bigquery=bq_config,
+        enrichment=enrichment_config,
+        sanity_checks=sanity_config,
         sample_mode=sample_mode,
         dry_run=dry_run,
         raw_yaml=raw,

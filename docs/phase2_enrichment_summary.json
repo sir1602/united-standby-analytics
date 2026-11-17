@@ -1,0 +1,495 @@
+{
+  "hub": "ORD",
+  "years": [
+    2019,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "sample_mode": false,
+  "total_flights": 830941,
+  "performed_flights": 814847,
+  "cancelled_flights": 16094,
+  "faa_match_metrics": {
+    "total_flights": 830941,
+    "performed_flights": 814847,
+    "cancelled_flights": 16094,
+    "non_null_tail_flights": 822719,
+    "null_tail_cancelled_flights": 8222,
+    "null_tail_performed_flights": 0,
+    "raw_faa_master_matched_non_null": 787703,
+    "raw_faa_dereg_matched_non_null": 17224,
+    "raw_faa_master_only_unmatched_rate_non_null": 0.042561,
+    "raw_faa_master_plus_dereg_commercial_unmatched_rate_non_null": 0.021626,
+    "raw_faa_master_plus_dereg_commercial_unmatched_rate_performed": 0.021458,
+    "tail_override_count": 24215,
+    "faa_master_count": 781292,
+    "faa_dereg_count": 17211,
+    "unassigned_cancelled_count": 8222,
+    "unmatched_typo_count": 1,
+    "unmatched_other_count": 0,
+    "post_override_unmatched_performed": 0,
+    "post_override_unmatched_rate_performed": 0.0,
+    "post_override_unmatched_non_null": 1,
+    "post_override_unmatched_rate_all_non_null": 1e-06,
+    "stearman_collisions_rejected": 9263
+  },
+  "aircraft_source_counts_all": {
+    "FAA_MASTER": 781292,
+    "TAIL_OVERRIDE": 24215,
+    "FAA_DEREG": 17211,
+    "UNASSIGNED_CANCELLED": 8222,
+    "UNMATCHED_TYPO": 1
+  },
+  "aircraft_source_counts_performed": {
+    "FAA_MASTER": 774107,
+    "TAIL_OVERRIDE": 23902,
+    "FAA_DEREG": 16838
+  },
+  "lf_source_counts_all": {
+    "CARRIER_ROUTE_MONTH_TYPE": 814497,
+    "CARRIER_ROUTE_MONTH": 16430,
+    "ROUTE_MONTH": 14
+  },
+  "lf_source_counts_performed": {
+    "CARRIER_ROUTE_MONTH_TYPE": 806852,
+    "CARRIER_ROUTE_MONTH": 7989,
+    "ROUTE_MONTH": 6
+  },
+  "shared_regional_spoke_flights": 76446,
+  "estimate_summary_performed": {
+    "seats_config": {
+      "non_null": 814847,
+      "mean": 114.3312,
+      "min": 50.0,
+      "median": 126.0,
+      "max": 364.0
+    },
+    "est_load_factor": {
+      "non_null": 814847,
+      "mean": 0.8195,
+      "min": 0.0,
+      "median": 0.841,
+      "max": 1.0
+    },
+    "est_passengers": {
+      "non_null": 814847,
+      "mean": 94.3256,
+      "min": 0.0,
+      "median": 77.0,
+      "max": 361.0
+    },
+    "est_open_seats": {
+      "non_null": 814847,
+      "mean": 20.0055,
+      "min": 0.0,
+      "median": 15.0,
+      "max": 352.0
+    },
+    "tsa_demand_multiplier": {
+      "non_null": 814847,
+      "mean": 1.0013,
+      "min": 0.8664,
+      "median": 1.0092,
+      "max": 1.1142
+    },
+    "hour_block_multiplier": {
+      "non_null": 814847,
+      "mean": 1.0081,
+      "min": 0.94,
+      "median": 1.02,
+      "max": 1.04
+    },
+    "est_lf_adjusted": {
+      "non_null": 814847,
+      "mean": 0.8275,
+      "min": 0.0,
+      "median": 0.8468,
+      "max": 1.0
+    },
+    "est_passengers_adjusted": {
+      "non_null": 814847,
+      "mean": 95.1555,
+      "min": 0.0,
+      "median": 76.0,
+      "max": 364.0
+    },
+    "est_open_seats_adjusted": {
+      "non_null": 814847,
+      "mean": 19.1757,
+      "min": 0.0,
+      "median": 14.0,
+      "max": 352.0
+    }
+  },
+  "confidence_tiers": {
+    "actual": [
+      "flight_date",
+      "year",
+      "quarter",
+      "month",
+      "day_of_month",
+      "day_of_week",
+      "mkt_carrier",
+      "op_carrier",
+      "flight_num_mkt",
+      "flight_num_op",
+      "tail_num",
+      "origin",
+      "origin_airport_id",
+      "dest",
+      "dest_airport_id",
+      "crs_dep_time",
+      "dep_time",
+      "crs_arr_time",
+      "arr_time",
+      "dep_delay_min",
+      "arr_delay_min",
+      "is_cancelled",
+      "cancellation_code",
+      "is_diverted",
+      "crs_elapsed_time_min",
+      "actual_elapsed_time_min",
+      "distance_miles",
+      "tsa_throughput"
+    ],
+    "derived": [
+      "tail_num_clean",
+      "dep_hour",
+      "hour_block",
+      "confidence_tier",
+      "aircraft_source",
+      "faa_manufacturer",
+      "faa_model",
+      "faa_tc_max_seats",
+      "fleet_subtype",
+      "bts_aircraft_type",
+      "seat_config_source",
+      "seats_config",
+      "seats_premium",
+      "seats_economy",
+      "t100_available",
+      "lf_source",
+      "is_shared_regional_spoke",
+      "record_confidence_summary"
+    ],
+    "estimated": [
+      "est_load_factor",
+      "tsa_demand_multiplier",
+      "hour_block_multiplier",
+      "est_passengers",
+      "est_open_seats",
+      "est_lf_adjusted",
+      "est_passengers_adjusted",
+      "est_open_seats_adjusted"
+    ]
+  },
+  "sanity_checks": {
+    "passed": true,
+    "failures_count": 0,
+    "warnings_count": 1,
+    "checks": [
+      {
+        "check_id": "SC-1",
+        "name": "Passenger & Load Factor Bounds",
+        "status": "PASS",
+        "message": "Checked 822,718 base-estimated and 822,718 adjusted rows; violations=0",
+        "details": {
+          "checked_base_rows": 822718,
+          "checked_adjusted_rows": 822718,
+          "bad_lf": 0,
+          "bad_lf_adj": 0,
+          "bad_base_pax": 0,
+          "bad_base_open": 0,
+          "bad_adj_pax": 0,
+          "bad_adj_open": 0,
+          "total_violations": 0
+        }
+      },
+      {
+        "check_id": "SC-2",
+        "name": "T-100 vs OTP Departure Reconciliation (\u00b110%)",
+        "status": "WARN",
+        "message": "Aggregate reconciliation passed (mainline=+0.16%, dedicated_express=+0.38%); 87 dedicated route-month cells outside \u00b110%",
+        "details": {
+          "sample_mode": false,
+          "tolerance": 0.1,
+          "mainline": {
+            "otp_performed": 411816,
+            "t100_departures_performed": 412485.0,
+            "aggregate_rel_diff": 0.001625,
+            "cells_total": 4690,
+            "cells_within_tolerance": 4666,
+            "cells_outside_tolerance": 24
+          },
+          "dedicated_express": {
+            "otp_performed": 126186,
+            "t100_departures_performed": 126670.0,
+            "aggregate_rel_diff": 0.003836,
+            "cells_total": 3728,
+            "cells_within_tolerance": 3665,
+            "cells_outside_tolerance": 63
+          },
+          "multi_brand_cpa": {
+            "otp_performed": 276845,
+            "t100_departures_performed": 356489.0,
+            "one_sided_check_passed": true
+          }
+        }
+      },
+      {
+        "check_id": "SC-3",
+        "name": "T-100 Seats-per-Departure vs Configured Seats",
+        "status": "PASS",
+        "message": "All 25 mapped BTS aircraft types within 10% of configured seats_config (max_diff=5.68%)",
+        "details": {
+          "types_checked": 25,
+          "warn_tolerance": 0.1,
+          "fail_tolerance": 0.15,
+          "max_bound_diff": 0.05678,
+          "warn_types": [],
+          "fail_types": [],
+          "per_type": [
+            {
+              "bts_aircraft_type": "530",
+              "t100_seats_per_dep": 50.0,
+              "config_min_seats": 50,
+              "config_max_seats": 50,
+              "bound_diff": 0.0,
+              "departures_performed": 76829.0
+            },
+            {
+              "bts_aircraft_type": "612",
+              "t100_seats_per_dep": 126.0,
+              "config_min_seats": 126,
+              "config_max_seats": 126,
+              "bound_diff": 0.0,
+              "departures_performed": 35230.0
+            },
+            {
+              "bts_aircraft_type": "614",
+              "t100_seats_per_dep": 166.0,
+              "config_min_seats": 166,
+              "config_max_seats": 166,
+              "bound_diff": 0.0,
+              "departures_performed": 74024.0
+            },
+            {
+              "bts_aircraft_type": "622",
+              "t100_seats_per_dep": 174.54,
+              "config_min_seats": 169,
+              "config_max_seats": 176,
+              "bound_diff": 0.0,
+              "departures_performed": 4836.0
+            },
+            {
+              "bts_aircraft_type": "623",
+              "t100_seats_per_dep": 234.0,
+              "config_min_seats": 234,
+              "config_max_seats": 234,
+              "bound_diff": 0.0,
+              "departures_performed": 17792.0
+            },
+            {
+              "bts_aircraft_type": "624",
+              "t100_seats_per_dep": 233.57,
+              "config_min_seats": 231,
+              "config_max_seats": 231,
+              "bound_diff": 0.011132,
+              "departures_performed": 42.0
+            },
+            {
+              "bts_aircraft_type": "626",
+              "t100_seats_per_dep": 200.67,
+              "config_min_seats": 167,
+              "config_max_seats": 203,
+              "bound_diff": 0.0,
+              "departures_performed": 469.0
+            },
+            {
+              "bts_aircraft_type": "627",
+              "t100_seats_per_dep": 353.61,
+              "config_min_seats": 276,
+              "config_max_seats": 364,
+              "bound_diff": 0.0,
+              "departures_performed": 6590.0
+            },
+            {
+              "bts_aircraft_type": "629",
+              "t100_seats_per_dep": 50.0,
+              "config_min_seats": 50,
+              "config_max_seats": 50,
+              "bound_diff": 0.0,
+              "departures_performed": 199409.0
+            },
+            {
+              "bts_aircraft_type": "631",
+              "t100_seats_per_dep": 66.31,
+              "config_min_seats": 70,
+              "config_max_seats": 70,
+              "bound_diff": 0.052722,
+              "departures_performed": 76083.0
+            },
+            {
+              "bts_aircraft_type": "634",
+              "t100_seats_per_dep": 179.0,
+              "config_min_seats": 179,
+              "config_max_seats": 179,
+              "bound_diff": 0.0,
+              "departures_performed": 255.0
+            },
+            {
+              "bts_aircraft_type": "637",
+              "t100_seats_per_dep": 350.31,
+              "config_min_seats": 350,
+              "config_max_seats": 350,
+              "bound_diff": 0.000896,
+              "departures_performed": 51.0
+            },
+            {
+              "bts_aircraft_type": "638",
+              "t100_seats_per_dep": 71.68,
+              "config_min_seats": 76,
+              "config_max_seats": 76,
+              "bound_diff": 0.05678,
+              "departures_performed": 1957.0
+            },
+            {
+              "bts_aircraft_type": "673",
+              "t100_seats_per_dep": 74.93,
+              "config_min_seats": 70,
+              "config_max_seats": 76,
+              "bound_diff": 0.0,
+              "departures_performed": 170772.0
+            },
+            {
+              "bts_aircraft_type": "675",
+              "t100_seats_per_dep": 50.0,
+              "config_min_seats": 50,
+              "config_max_seats": 50,
+              "bound_diff": 0.0,
+              "departures_performed": 20582.0
+            },
+            {
+              "bts_aircraft_type": "677",
+              "t100_seats_per_dep": 69.99,
+              "config_min_seats": 70,
+              "config_max_seats": 70,
+              "bound_diff": 0.000154,
+              "departures_performed": 17816.0
+            },
+            {
+              "bts_aircraft_type": "694",
+              "t100_seats_per_dep": 150.0,
+              "config_min_seats": 150,
+              "config_max_seats": 150,
+              "bound_diff": 0.0,
+              "departures_performed": 55077.0
+            },
+            {
+              "bts_aircraft_type": "698",
+              "t100_seats_per_dep": 126.44,
+              "config_min_seats": 126,
+              "config_max_seats": 126,
+              "bound_diff": 0.003493,
+              "departures_performed": 53955.0
+            },
+            {
+              "bts_aircraft_type": "721",
+              "t100_seats_per_dep": 200.0,
+              "config_min_seats": 200,
+              "config_max_seats": 200,
+              "bound_diff": 0.0,
+              "departures_performed": 31468.0
+            },
+            {
+              "bts_aircraft_type": "837",
+              "t100_seats_per_dep": 318.0,
+              "config_min_seats": 318,
+              "config_max_seats": 318,
+              "bound_diff": 0.0,
+              "departures_performed": 2031.0
+            },
+            {
+              "bts_aircraft_type": "838",
+              "t100_seats_per_dep": 166.0,
+              "config_min_seats": 166,
+              "config_max_seats": 166,
+              "bound_diff": 0.0,
+              "departures_performed": 22024.0
+            },
+            {
+              "bts_aircraft_type": "839",
+              "t100_seats_per_dep": 179.0,
+              "config_min_seats": 179,
+              "config_max_seats": 179,
+              "bound_diff": 0.0,
+              "departures_performed": 29629.0
+            },
+            {
+              "bts_aircraft_type": "887",
+              "t100_seats_per_dep": 243.0,
+              "config_min_seats": 243,
+              "config_max_seats": 243,
+              "bound_diff": 0.0,
+              "departures_performed": 1004.0
+            },
+            {
+              "bts_aircraft_type": "888",
+              "t100_seats_per_dep": 179.0,
+              "config_min_seats": 179,
+              "config_max_seats": 179,
+              "bound_diff": 0.0,
+              "departures_performed": 77892.0
+            },
+            {
+              "bts_aircraft_type": "889",
+              "t100_seats_per_dep": 254.9,
+              "config_min_seats": 257,
+              "config_max_seats": 257,
+              "bound_diff": 0.008171,
+              "departures_performed": 250.0
+            }
+          ]
+        }
+      },
+      {
+        "check_id": "SC-4",
+        "name": "System-Wide UA Load Factor (~80-85%)",
+        "status": "PASS",
+        "message": "All UA annual & overall load factors inside target (0.8, 0.86): overall=82.8945%",
+        "details": {
+          "sample_mode": false,
+          "overall_load_factor": 0.828945,
+          "by_year_load_factor": {
+            "2019": 0.841653,
+            "2023": 0.838822,
+            "2024": 0.831731,
+            "2025": 0.814935,
+            "2026": 0.818515
+          },
+          "warn_bounds": [
+            0.8,
+            0.86
+          ],
+          "fail_bounds": [
+            0.75,
+            0.9
+          ]
+        }
+      },
+      {
+        "check_id": "SC-5",
+        "name": "Missing T-100 Null Invariant (Zero Silent Imputation)",
+        "status": "PASS",
+        "message": "Checked 0 unmatched T-100 row(s); silent imputation violations=0",
+        "details": {
+          "unmatched_t100_rows": 0,
+          "violations_by_column": {},
+          "total_violations": 0
+        }
+      }
+    ]
+  }
+}

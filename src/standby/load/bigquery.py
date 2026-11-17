@@ -86,7 +86,7 @@ def build_load_job_config(
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         source_format=bigquery.SourceFormat.PARQUET,
     )
-    if table_name == "otp_marketing_flights" and "flight_date" in df.columns:
+    if table_name in {"otp_marketing_flights", "enriched_flights"} and "flight_date" in df.columns:
         # Fact flight table clustering & partition config (`expiration_ms=None` strictly enforced per D-08)
         job_config.clustering_fields = ["origin", "dest", "op_carrier"]
         job_config.time_partitioning = bigquery.TimePartitioning(

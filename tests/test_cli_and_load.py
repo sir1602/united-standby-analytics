@@ -144,13 +144,44 @@ def test_cli_verify_manifest_ingest_load_raw_and_run_sample(
     assert "RAW LOAD SUCCEEDED: manifest_files=13" in res_load_raw.output
     assert "loaded_tables=6" in res_load_raw.output
 
+    res_enrich = runner.invoke(
+        main,
+        ["enrich", "--hub", "ORD", "--years", "2019,2023-2026", "--sample"],
+    )
+    assert res_enrich.exit_code == 0, res_enrich.output
+    assert "ENRICHMENT PASSED: flights=80" in res_enrich.output
+    assert "post_override_unmatched_performed=0" in res_enrich.output
+    assert "sanity_failures=0" in res_enrich.output
+
     res_run = runner.invoke(
         main,
         ["run", "--hub", "ORD", "--years", "2019,2023-2026", "--sample", "--dry-run"],
     )
     assert res_run.exit_code == 0, res_run.output
     assert "PIPELINE RUN SUCCEEDED: manifest_files=13" in res_run.output
-    assert (tmp_path / "processed" / "sample" / "otp_marketing_flights.parquet").is_file()
+    assert "enrichment_unmatched_performed=0" in res_run.output
+    otp_parquet = tmp_path / "processed" / "sample" / "otp_marketing_flights.parquet"
+    assert otp_parquet.is_file()
+    enriched_schema = pq.read_schema(otp_parquet)
+    for col in (
+        "aircraft_source",
+        "fleet_subtype",
+        "bts_aircraft_type",
+        "seats_config",
+        "t100_available",
+        "lf_source",
+        "est_load_factor",
+        "est_passengers",
+        "est_open_seats",
+        "tsa_demand_multiplier",
+        "hour_block_multiplier",
+        "est_lf_adjusted",
+        "est_passengers_adjusted",
+        "est_open_seats_adjusted",
+        "record_confidence_summary",
+    ):
+        assert col in enriched_schema.names, f"Missing enriched column {col} in Parquet"
+    assert str(enriched_schema.field("flight_date").type) == "date32[day]"
 
 
 def test_parse_years_arg_and_load_config_rejects_invalid_and_empty_years(repo_root: Path) -> None:
@@ -183,6 +214,7 @@ def test_parse_years_arg_and_load_config_rejects_invalid_and_empty_years(repo_ro
     "cmd",
     [
         ["ingest", "--sample"],
+        ["enrich", "--sample"],
         ["load-raw", "--sample", "--dry-run"],
         ["run", "--sample", "--dry-run"],
     ],
@@ -262,3 +294,46 @@ def test_prepare_dataframe_for_bigquery_and_load_job_config_empty_flight_date_df
         f.name: f.field_type for f in infer_bigquery_schema(prepared_other, "other_table")
     }
     assert other_schema["flight_date"] == "DATE"
+
+
+@pytest.mark.parametrize("empty_rows", [False, True])
+def test_enriched_flights_bigquery_partitioning_clustering_and_parquet(
+    sample_ingested: dict[str, pd.DataFrame],
+    sample_config: StandbyConfig,
+    tmp_path: Path,
+    empty_rows: bool,
+) -> None:
+    """`enriched_flights` sets `flight_date` DAY partitioning, clustering, and `date32[day]` Parquet for populated and 0-row DataFrames."""
+    from google.cloud.bigquery import _pandas_helpers
+
+    from standby.enrichment import enrich_flights
+
+    res = enrich_flights(
+        otp_df=sample_ingested["otp_marketing_flights"],
+        t100_df=sample_ingested["t100_segments"],
+        faa_registry_df=sample_ingested["faa_aircraft_registry"],
+        faa_acftref_df=sample_ingested["faa_acftref"],
+        tsa_df=sample_ingested["tsa_daily_throughput"],
+        reference_dir=sample_config.reference_dir,
+        config=sample_config,
+    )
+    enriched_df = (
+        res.enriched_flights.iloc[0:0].copy() if empty_rows else res.enriched_flights.copy()
+    )
+    prepared = prepare_dataframe_for_bigquery(enriched_df, "enriched_flights")
+    bq_schema = infer_bigquery_schema(prepared, "enriched_flights")
+    schema_map = {f.name: f.field_type for f in bq_schema}
+    assert schema_map["flight_date"] == "DATE"
+
+    parquet_path = tmp_path / f"enriched_flights_{'empty' if empty_rows else 'populated'}.parquet"
+    _pandas_helpers.dataframe_to_parquet(prepared, bq_schema, str(parquet_path))
+    arrow_schema = pq.read_schema(parquet_path)
+    assert str(arrow_schema.field("flight_date").type) == "date32[day]"
+
+    job_config = build_load_job_config(prepared, "enriched_flights", partition_expiration_ms=None)
+    assert str(job_config.write_disposition) == "WRITE_TRUNCATE"
+    assert job_config.time_partitioning is not None
+    assert str(job_config.time_partitioning.type_) == "DAY"
+    assert job_config.time_partitioning.field == "flight_date"
+    assert job_config.time_partitioning.expiration_ms is None
+    assert list(job_config.clustering_fields) == ["origin", "dest", "op_carrier"]
