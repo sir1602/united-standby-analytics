@@ -1,0 +1,216 @@
+version: 2
+
+models:
+  - name: stg_otp_flights
+    description: >
+      Standardized BTS Marketing Carrier On-Time Performance flights from the 31 base
+      raw columns, filtered to configured hubs, analysis years, and marketing carrier.
+      Normalizes hhmm '2400' -> '0000', assigns departure hour_block, normalizes N-prefix
+      tail numbers, and generates deterministic surrogate primary key `flight_id`.
+    columns:
+      - name: flight_id
+        description: "Deterministic flight primary key (YYYYMMDD|mkt_carrier|flight_num_mkt|origin|dest|crs_dep_time)."
+        data_tests:
+          - unique
+          - not_null
+      - name: flight_date
+        description: "Scheduled departure date (DATE)."
+        data_tests:
+          - not_null
+      - name: mkt_carrier
+        description: "Marketing carrier code (e.g., UA)."
+        data_tests:
+          - not_null
+      - name: op_carrier
+        description: "Operating carrier IATA code."
+        data_tests:
+          - not_null
+      - name: origin
+        description: "Origin airport IATA code."
+        data_tests:
+          - not_null
+      - name: dest
+        description: "Destination airport IATA code."
+        data_tests:
+          - not_null
+      - name: crs_dep_time
+        description: "Normalized 4-char scheduled local departure time (hhmm, '2400' -> '0000')."
+        data_tests:
+          - not_null
+      - name: dep_hour
+        description: "Scheduled departure hour (0-23)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 23
+      - name: hour_block
+        description: "Departure hour block bucket (early, morning, midday, afternoon, evening, late)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["early", "morning", "midday", "afternoon", "evening", "late"]
+      - name: dep_time
+        description: "Normalized actual departure time (required on non-cancelled flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled"
+      - name: arr_time
+        description: "Normalized actual arrival time (required on non-cancelled, non-diverted flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled and not is_diverted"
+      - name: tail_num
+        description: "Normalized aircraft tail number with N prefix (required on non-cancelled flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled"
+
+  - name: stg_t100_segments
+    description: >
+      Standardized BTS T-100 Segment rows filtered to service_class='F', configured hubs,
+      and analysis years, aggregated to the unique
+      (year, month, op_carrier, origin, dest, bts_aircraft_type, data_source) grain
+      (collapsing multi-aircraft_config and scheduled/extra-section sub-rows).
+      Covers both Domestic (DU/DF) and International (IU/IF) segments.
+    data_tests:
+      - unique_combination_of_columns:
+          combination_of_columns:
+            - year
+            - month
+            - op_carrier
+            - origin
+            - dest
+            - bts_aircraft_type
+            - data_source
+    columns:
+      - name: year
+        description: "Segment year."
+        data_tests:
+          - not_null
+      - name: month
+        description: "Segment month (1-12)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: op_carrier
+        description: "Operating carrier code."
+        data_tests:
+          - not_null
+      - name: origin
+        description: "Origin airport IATA code."
+        data_tests:
+          - not_null
+      - name: dest
+        description: "Destination airport IATA code."
+        data_tests:
+          - not_null
+      - name: is_ua_family
+        description: "True if op_carrier belongs to United mainline + Express partner family."
+        data_tests:
+          - not_null
+      - name: load_factor
+        description: "Observed T-100 segment load factor (passengers / seats), clipped to [0, 1]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+
+  - name: stg_faa_aircraft
+    description: "Deduplicated FAA MASTER and DEREG aircraft registration rows (1 row per n_number + registry_source)."
+    data_tests:
+      - unique_combination_of_columns:
+          combination_of_columns:
+            - n_number
+            - registry_source
+    columns:
+      - name: n_number
+        description: "FAA N-number without leading N."
+        data_tests:
+          - not_null
+      - name: registry_source
+        description: "FAA source file: faa_master or faa_dereg."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["faa_master", "faa_dereg"]
+
+  - name: stg_faa_acftref
+    description: "FAA ACFTREF lookup filtered to commercial airliners with faa_tc_max_seats >= 20 (D-19)."
+    columns:
+      - name: code
+        description: "FAA manufacturer/model code primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: faa_tc_max_seats
+        description: "FAA Type Certificate max seats (>= 20)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 20
+              max_value: 900
+
+  - name: stg_tsa_throughput
+    description: >
+      Daily national TSA checkpoint screening throughput with DATE parsing, monthly-relative
+      damped multiplier (alpha=0.35, bounds [0.80, 1.20]), and annual-relative TSA ratio.
+    columns:
+      - name: date_day
+        description: "Calendar date primary key (DATE)."
+        data_tests:
+          - unique
+          - not_null
+      - name: tsa_throughput
+        description: "Daily national checkpoint volume."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      - name: tsa_demand_multiplier
+        description: "Damped monthly TSA demand multiplier clipped to [0.80, 1.20]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.80
+              max_value: 1.20
+
+  - name: stg_bts_airports
+    description: "Clean BTS airport lookup keyed on IATA airport_code (avoids airport_id=14027 PBI/DJT collision)."
+    columns:
+      - name: airport_code
+        description: "3-character IATA/FAA airport code primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: airport_name
+        description: "Official BTS airport description."
+        data_tests:
+          - not_null
+
+  - name: stg_bts_carriers
+    description: "Clean BTS carrier lookup keyed 1:1 on op_carrier from L_UNIQUE_CARRIERS with aggregated L_CARRIER_HISTORY."
+    columns:
+      - name: op_carrier
+        description: "Operating carrier IATA/DOT code primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: carrier_name
+        description: "Official carrier name."
+        data_tests:
+          - not_null
+
+  - name: stg_bts_aircraft_types
+    description: "Clean BTS T-100 aircraft type lookup keyed on 3-character bts_aircraft_type code."
+    columns:
+      - name: bts_aircraft_type
+        description: "BTS 3-character aircraft type primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: bts_aircraft_description
+        description: "Official BTS aircraft type description."
+        data_tests:
+          - not_null

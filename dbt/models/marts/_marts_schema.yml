@@ -1,0 +1,292 @@
+version: 2
+
+models:
+  - name: fct_flights
+    description: >
+      Core domestic flight fact mart partitioned by DAY on `flight_date` (NONE expiry)
+      and clustered by `origin, dest, op_carrier`. Combines observed BTS OTP actuals,
+      3-tier aircraft/seat configurations, 3-tier T-100 monthly load factors, separate
+      modeled TSA/hour-block demand adjustments, and same-day displacement/backup counts.
+      Phase 3 exposes typed NULL placeholders for `soi_historical` and `soi_planning`.
+    columns:
+      - name: flight_id
+        description: "Deterministic primary key (YYYYMMDD|mkt_carrier|flight_num_mkt|origin|dest|crs_dep_time)."
+        data_tests:
+          - unique
+          - not_null
+      - name: flight_date
+        description: "Partition key: local scheduled departure date (DATE). FK to dim_date."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_day
+      - name: op_carrier
+        description: "Operating carrier IATA code. FK to dim_carrier."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_carrier')
+              field: op_carrier
+      - name: origin
+        description: "Origin airport IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: dest
+        description: "Destination airport IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: tail_num
+        description: "Normalized N-number tail identifier. FK to dim_aircraft (required on non-cancelled flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled"
+          - relationships:
+              to: ref('dim_aircraft')
+              field: tail_num
+              config:
+                where: "tail_num is not null"
+      - name: hour_block
+        description: "Departure hour block bucket (early, morning, midday, afternoon, evening, late)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["early", "morning", "midday", "afternoon", "evening", "late"]
+      - name: dep_time
+        description: "Actual local departure time (required on non-cancelled flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled"
+      - name: arr_time
+        description: "Actual local arrival time (required on non-cancelled, non-diverted flights)."
+        data_tests:
+          - not_null_where:
+              where_clause: "not is_cancelled and not is_diverted"
+      - name: seats_config
+        description: "Resolved total physical cabin seats (derived tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 20
+              max_value: 500
+      - name: lf_source
+        description: "T-100 LF lookup fallback tier used."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["CARRIER_ROUTE_MONTH_TYPE", "CARRIER_ROUTE_MONTH", "ROUTE_MONTH", "UNMATCHED"]
+      - name: est_load_factor
+        description: "Base T-100 monthly load factor (estimated tier, NULL when unmatched)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+      - name: est_passengers
+        description: "Base estimated passengers (estimated tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: est_open_seats
+        description: "Base estimated open seats (estimated tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: est_lf_adjusted
+        description: "Modeled TSA + hour-block adjusted load factor (estimated tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+      - name: est_passengers_adjusted
+        description: "Modeled adjusted passenger estimate (estimated tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: est_open_seats_adjusted
+        description: "Modeled adjusted open seat estimate (estimated tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: soi_historical
+        description: "Phase 4 Standby Opportunity Index (historical post-hoc variant; typed NULL placeholder in Phase 3)."
+      - name: soi_planning
+        description: "Phase 4 Standby Opportunity Index (leakage-free planning variant; typed NULL placeholder in Phase 3)."
+
+  - name: agg_route_month
+    description: >
+      Route x Month x Operating Carrier aggregate mart covering BOTH Domestic (DU/DF) and
+      International (IU/IF) BTS T-100 segments for the United Airlines carrier family.
+      International rows are explicitly labeled `is_international = true` and
+      `data_granularity = 'route_month_only_v1'` per D-04 (OTP fields remain NULL for international).
+    data_tests:
+      - unique_combination_of_columns:
+          combination_of_columns:
+            - year
+            - month
+            - op_carrier
+            - origin
+            - dest
+            - is_international
+    columns:
+      - name: route_month_id
+        description: "Deterministic surrogate primary key (YYYY-MM|op_carrier|origin|dest|DOM/INTL)."
+        data_tests:
+          - unique
+          - not_null
+      - name: year
+        description: "Segment year."
+        data_tests:
+          - not_null
+      - name: month
+        description: "Segment month (1-12)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: op_carrier
+        description: "Operating carrier code. FK to dim_carrier."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_carrier')
+              field: op_carrier
+      - name: origin
+        description: "Origin airport IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: dest
+        description: "Destination airport IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: is_international
+        description: "True for T-100 International segments (IU/IF); False for Domestic (DU/DF)."
+        data_tests:
+          - not_null
+      - name: data_granularity
+        description: "Coverage granularity indicator ('flight_and_route_month' vs 'route_month_only_v1')."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["flight_and_route_month", "route_month_only_v1"]
+      - name: t100_load_factor
+        description: "Observed T-100 monthly route load factor (passengers / seats)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+
+  - name: dim_aircraft
+    description: >
+      Conformed aircraft dimension keyed 1:1 on `tail_num`, handling multi-carrier
+      regional tails cleanly via aggregated `operating_carriers` and preserving
+      curated `source_url` and `as_of` provenance.
+    columns:
+      - name: tail_num
+        description: "Normalized US N-number primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: seats_config
+        description: "Resolved total physical cabin seats (NULL only for invalid dispatcher typos)."
+        data_tests:
+          - accepted_range:
+              min_value: 20
+              max_value: 500
+      - name: confidence_tier
+        description: "Confidence tier classification (derived or actual)."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["derived", "actual"]
+
+  - name: dim_airport
+    description: >
+      Conformed airport dimension keyed on IATA `airport_code` covering all domestic OTP
+      and UA-family domestic + international T-100 stations (avoids DOT airport_id=14027 PBI/DJT collision).
+    columns:
+      - name: airport_code
+        description: "3-character IATA/FAA airport code primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: is_hub
+        description: "True when airport_code is in configured hub list (ORD)."
+        data_tests:
+          - not_null
+      - name: has_domestic_service
+        description: "True if station appears in domestic OTP or domestic T-100 segments."
+        data_tests:
+          - not_null
+      - name: has_international_service
+        description: "True if station appears in international T-100 segments."
+        data_tests:
+          - not_null
+
+  - name: dim_carrier
+    description: >
+      Conformed operating carrier dimension keyed 1:1 on `op_carrier` covering United mainline
+      and Express CPA partners (including 2019 historical partners EV and AX).
+    columns:
+      - name: op_carrier
+        description: "Operating carrier IATA code primary key."
+        data_tests:
+          - unique
+          - not_null
+      - name: carrier_group
+        description: "Carrier group classification: MAINLINE or EXPRESS."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["MAINLINE", "EXPRESS"]
+      - name: is_shared_cpa_carrier
+        description: "True for multi-brand regional carriers (OO, YX, YV, ZW)."
+        data_tests:
+          - not_null
+
+  - name: dim_date
+    description: >
+      Conformed calendar date dimension keyed on `date_day` (DATE) with ISO day-of-week,
+      deterministic US holiday window indicators, and daily TSA checkpoint metrics.
+    columns:
+      - name: date_day
+        description: "Calendar date primary key (DATE)."
+        data_tests:
+          - unique
+          - not_null
+      - name: day_of_week
+        description: "ISO day of week (1=Monday .. 7=Sunday)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: is_weekend
+        description: "True on Saturday (6) and Sunday (7)."
+        data_tests:
+          - not_null
+      - name: is_holiday_window
+        description: "True when date falls inside deterministic US holiday travel windows."
+        data_tests:
+          - not_null
+      - name: tsa_demand_multiplier
+        description: "Damped monthly-relative TSA demand multiplier [0.80, 1.20]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.80
+              max_value: 1.20

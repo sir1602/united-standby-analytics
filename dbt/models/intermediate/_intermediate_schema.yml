@@ -1,0 +1,133 @@
+version: 2
+
+models:
+  - name: int_aircraft_enriched
+    description: >
+      Enriches stg_otp_flights 1:1 with 3-tier aircraft and seat configuration resolution
+      (TAIL_OVERRIDE -> FAA_MASTER -> FAA_DEREG) + faa_t100_crosswalk + seat_config.
+    columns:
+      - name: flight_id
+        description: "Primary key preserved 1:1 from stg_otp_flights."
+        data_tests:
+          - unique
+          - not_null
+      - name: aircraft_source
+        description: "Resolution tier used for aircraft identity."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["TAIL_OVERRIDE", "FAA_MASTER", "FAA_DEREG", "UNASSIGNED_CANCELLED", "UNMATCHED_TYPO", "UNMATCHED"]
+      - name: seat_config_source
+        description: "Resolution tier used for cabin seat configuration."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["TAIL_OVERRIDE", "SUBTYPE_DEFAULT", "UNASSIGNED_CANCELLED", "UNMATCHED"]
+      - name: seats_config
+        description: "Resolved total physical cabin seats (derived tier)."
+        data_tests:
+          - accepted_range:
+              min_value: 20
+              max_value: 500
+
+  - name: int_t100_load_factors
+    description: >
+      Joins domestic T-100 segments onto int_aircraft_enriched via the 3-tier LF hierarchy
+      (CARRIER_ROUTE_MONTH_TYPE -> CARRIER_ROUTE_MONTH -> ROUTE_MONTH -> UNMATCHED)
+      with shared CPA regional spoke detection.
+    columns:
+      - name: flight_id
+        description: "Primary key preserved 1:1 from int_aircraft_enriched."
+        data_tests:
+          - unique
+          - not_null
+      - name: t100_available
+        description: "True if the flight's (year, month) exists in domestic T-100."
+        data_tests:
+          - not_null
+      - name: lf_source
+        description: "T-100 LF lookup fallback tier used."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["CARRIER_ROUTE_MONTH_TYPE", "CARRIER_ROUTE_MONTH", "ROUTE_MONTH", "UNMATCHED"]
+      - name: is_shared_regional_spoke
+        description: "True when a shared CPA regional carrier reports >10% more T-100 departures than UA OTP."
+        data_tests:
+          - not_null
+      - name: est_load_factor
+        description: "Base monthly T-100 load factor (NULL when unmatched)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+
+  - name: int_flight_estimates
+    description: >
+      Computes base estimated passengers/open seats and separate modeled TSA + hour-block
+      adjusted estimates, enforcing NULL whenever T-100 match is missing (D-22, SC-5).
+    columns:
+      - name: flight_id
+        description: "Primary key preserved 1:1 from int_t100_load_factors."
+        data_tests:
+          - unique
+          - not_null
+      - name: est_passengers
+        description: "Base estimated revenue passengers (rounded seats_config * est_load_factor)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: est_open_seats
+        description: "Base estimated open seats (seats_config - est_passengers)."
+        data_tests:
+          - accepted_range:
+              min_value: 0
+              max_value: 500
+      - name: est_lf_adjusted
+        description: "Modeled adjusted load factor (est_load_factor * tsa_demand_multiplier * hour_block_multiplier)."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+
+  - name: int_flight_displacements_backups
+    description: >
+      Same-day route-level displacement pressure (earlier cancellations/diversions decayed by 0.75^delta_k)
+      and remaining scheduled/performed backup departure counts using deterministic tie-breaking.
+    columns:
+      - name: flight_id
+        description: "Primary key preserved 1:1 from stg_otp_flights."
+        data_tests:
+          - unique
+          - not_null
+      - name: route_day_seq
+        description: "1-based deterministic sequence within (origin, dest, flight_date)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+      - name: prior_scheduled_count
+        description: "Count of earlier scheduled flights on the same route and date."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      - name: weighted_displacement_hist
+        description: "Decayed sum of earlier same-day cancellations (1.0) and diversions (0.5)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0.0
+      - name: remaining_scheduled_backups
+        description: "Count of strictly later scheduled same-day departures on the same route."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+      - name: remaining_performed_backups
+        description: "Count of strictly later non-cancelled same-day departures on the same route."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0

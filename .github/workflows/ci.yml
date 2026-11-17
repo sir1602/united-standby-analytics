@@ -11,7 +11,7 @@ on:
 
 jobs:
   lint-test-parse:
-    name: Ruff, Pytest (Sample) & dbt Parse
+    name: Ruff, Pytest (Sample) & dbt Compile
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -43,5 +43,11 @@ jobs:
       - name: Run CLI end-to-end sample dry-run
         run: .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026 --sample --dry-run
 
-      - name: Validate dbt project compilation (offline parse)
+      - name: Validate dbt project (offline parse)
         run: .venv/bin/dbt parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+
+      - name: Validate dbt SQL compilation (offline compile)
+        run: .venv/bin/dbt compile --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+
+      - name: Generate dbt catalog docs (offline empty-catalog)
+        run: .venv/bin/dbt docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats

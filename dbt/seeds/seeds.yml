@@ -1,0 +1,150 @@
+version: 2
+
+seeds:
+  - name: seat_config
+    description: >
+      Curated United Airlines mainline and United Express fleet-subtype cabin seat
+      configurations (31 subtypes). Every row includes verifiable source_url and as_of date.
+      Confidence tier: derived.
+    columns:
+      - name: subtype
+        description: "Primary key identifying the fleet subtype (e.g., B737-900ER, CRJ-550)."
+        data_tests:
+          - unique
+          - not_null
+      - name: op_carrier_group
+        description: "Carrier group classification: MAINLINE or EXPRESS."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["MAINLINE", "EXPRESS"]
+      - name: seats_total
+        description: "Total physical passenger seats (seats_premium + seats_economy)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 20
+              max_value: 500
+      - name: seats_premium
+        description: "First / Polaris / Premium Plus seat count."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 150
+      - name: seats_economy
+        description: "Economy + Economy Plus seat count."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 20
+              max_value: 450
+      - name: source_url
+        description: "Authoritative public fleet / seat map URL."
+        data_tests:
+          - not_null
+      - name: as_of
+        description: "Curation effective date (YYYY-MM-DD)."
+        data_tests:
+          - not_null
+      - name: notes
+        description: "Cabin breakdown notes."
+
+  - name: tail_overrides
+    description: >
+      Tail-level overrides (152 tails) resolving multi-configuration mainline sub-fleets
+      (777-200 HD vs Intl, 767-300ER, 757-200) and historical 2019 regional N-number
+      reassignments/purges. Confidence tier: derived.
+    columns:
+      - name: tail_num
+        description: "Normalized US N-number primary key (e.g., N204UA)."
+        data_tests:
+          - unique
+          - not_null
+      - name: op_carrier
+        description: "Operating carrier IATA code."
+        data_tests:
+          - not_null
+      - name: subtype
+        description: "Foreign key to seat_config.subtype."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('seat_config')
+              field: subtype
+      - name: bts_aircraft_type
+        description: "BTS T-100 3-character AIRCRAFT_TYPE string code."
+        data_tests:
+          - not_null
+      - name: seats_total
+        description: "Override total physical cabin seats."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 20
+              max_value: 500
+      - name: seats_premium
+        description: "Override premium cabin seats."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
+              max_value: 150
+      - name: seats_economy
+        description: "Override economy cabin seats."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 20
+              max_value: 450
+      - name: source_url
+        description: "Verification source URL."
+        data_tests:
+          - not_null
+      - name: as_of
+        description: "Curation effective date (YYYY-MM-DD)."
+        data_tests:
+          - not_null
+      - name: override_reason
+        description: "Reason category and explanation for tail override."
+        data_tests:
+          - not_null
+
+  - name: faa_t100_crosswalk
+    description: >
+      Curated crosswalk (56 rules) mapping FAA ACFTREF manufacturer/model and operating
+      carrier to United fleet subtype and BTS T-100 3-character AIRCRAFT_TYPE code.
+    data_tests:
+      - unique_combination_of_columns:
+          combination_of_columns:
+            - faa_mfr
+            - faa_model
+            - op_carrier
+    columns:
+      - name: faa_mfr
+        description: "FAA ACFTREF MFR uppercase string."
+        data_tests:
+          - not_null
+      - name: faa_model
+        description: "FAA ACFTREF MODEL uppercase string."
+        data_tests:
+          - not_null
+      - name: op_carrier
+        description: "Operating carrier code."
+        data_tests:
+          - not_null
+      - name: subtype
+        description: "Foreign key to seat_config.subtype."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('seat_config')
+              field: subtype
+      - name: bts_aircraft_type
+        description: "BTS T-100 3-character AIRCRAFT_TYPE string code."
+        data_tests:
+          - not_null
+      - name: bts_description
+        description: "Official L_AIRCRAFT_TYPE description."
+      - name: notes
+        description: "Crosswalk mapping notes."

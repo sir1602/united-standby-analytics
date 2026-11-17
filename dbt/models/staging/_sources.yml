@@ -1,0 +1,118 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Raw standardized tables batch-loaded into BigQuery by `python -m standby`
+      (`load-raw` or `run`) with explicit schemas, DAY partitioning on `otp_marketing_flights.flight_date`,
+      and `NONE` partition expiration (D-08).
+    database: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
+    schema: raw
+    tables:
+      - name: otp_marketing_flights
+        description: "BTS Marketing Carrier On-Time Performance flights (31 base standardized columns + optional Phase 2 enrichment columns)."
+        columns:
+          - name: flight_date
+            description: "Local scheduled departure date (DATE)."
+            data_tests:
+              - not_null
+          - name: mkt_carrier
+            description: "Marketing carrier code (e.g., UA)."
+            data_tests:
+              - not_null
+          - name: op_carrier
+            description: "Operating carrier IATA code."
+            data_tests:
+              - not_null
+          - name: origin
+            description: "Origin airport IATA code."
+            data_tests:
+              - not_null
+          - name: dest
+            description: "Destination airport IATA code."
+            data_tests:
+              - not_null
+          - name: crs_dep_time
+            description: "Scheduled local departure time (hhmm)."
+            data_tests:
+              - not_null
+
+      - name: t100_segments
+        description: "BTS T-100 Segment (All Carriers) domestic and international monthly segment totals."
+        columns:
+          - name: year
+            description: "Segment year."
+            data_tests:
+              - not_null
+          - name: month
+            description: "Segment month (1-12)."
+            data_tests:
+              - not_null
+          - name: op_carrier
+            description: "Operating carrier code (UNIQUE_CARRIER)."
+            data_tests:
+              - not_null
+          - name: origin
+            description: "Origin airport IATA code."
+            data_tests:
+              - not_null
+          - name: dest
+            description: "Destination airport IATA code."
+            data_tests:
+              - not_null
+
+      - name: faa_aircraft_registry
+        description: "Commercial-airliner-filtered FAA MASTER.txt and DEREG.txt aircraft registrations."
+        columns:
+          - name: n_number
+            description: "FAA N-number without leading N."
+            data_tests:
+              - not_null
+          - name: mfr_mdl_code
+            description: "FAA manufacturer/model reference code."
+            data_tests:
+              - not_null
+          - name: registry_source
+            description: "Originating FAA file: faa_master or faa_dereg."
+            data_tests:
+              - not_null
+              - accepted_values:
+                  values: ["faa_master", "faa_dereg"]
+
+      - name: faa_acftref
+        description: "FAA ACFTREF.txt aircraft manufacturer, model, and Type Certificate max seats reference."
+        columns:
+          - name: code
+            description: "FAA manufacturer/model code."
+            data_tests:
+              - unique
+              - not_null
+
+      - name: tsa_daily_throughput
+        description: "Daily national TSA checkpoint screening volumes (2019, 2023-2026)."
+        columns:
+          - name: date_day
+            description: "ISO date string YYYY-MM-DD."
+            data_tests:
+              - unique
+              - not_null
+          - name: tsa_throughput
+            description: "Daily checkpoint passenger screening count."
+            data_tests:
+              - not_null
+
+      - name: bts_lookups
+        description: "Unified BTS TranStats lookup tables (L_AIRPORT, L_AIRPORT_ID, L_UNIQUE_CARRIERS, L_CARRIER_HISTORY, L_AIRCRAFT_TYPE)."
+        columns:
+          - name: lookup_table
+            description: "Source lookup CSV stem."
+            data_tests:
+              - not_null
+          - name: code
+            description: "Lookup code."
+            data_tests:
+              - not_null
+          - name: description
+            description: "Lookup description."
+            data_tests:
+              - not_null
