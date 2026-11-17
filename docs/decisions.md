@@ -1,10 +1,10 @@
 # Technical Decisions & Assumptions Log (`docs/decisions.md`)
 
-Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, and the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**.
+Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, and the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**.
 
 ---
 
-## Summary Table (`D-01` – `D-23`)
+## Summary Table (`D-01` – `D-28`)
 
 | ID | Category | Decision Title | Choice Made | Status |
 |---|---|---|---|---|
@@ -31,6 +31,11 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-21** | Enrichment (Phase 2) | 3-Tier Domestic T-100 LF Hierarchy & Zero Silent Imputation | Join domestic T-100 via `CARRIER_ROUTE_MONTH_TYPE` → `CARRIER_ROUTE_MONTH` → `ROUTE_MONTH` and leave all `est_*` columns `NULL` on missing/unmatched T-100 | Phase 2 Enrichment |
 | **D-22** | Enrichment (Phase 2) | Base Estimates vs. Modeled Demand Adjustments | Keep base estimates (`est_load_factor`, `est_passengers`, `est_open_seats`) separate from modeled TSA/hour-block adjustments (`est_*_adjusted`) | Phase 2 Enrichment |
 | **D-23** | Validation (Phase 2) | Column Confidence-Tier Registry & Section 7 Sanity Checks (`SC-1`..`SC-5`) | Register every column in `COLUMN_CONFIDENCE_TIERS` and gate pipeline runs on `SC-1`..`SC-5` (`0` failures across `830,941` flights) | Phase 2 Enrichment |
+| **D-24** | dbt CI & Tooling (Phase 3) | Offline BigQuery `oauth-secrets` CI Profile, Custom Schema Resolution & Zero-Dependency Tests | Use `method: oauth-secrets` placeholder in `target: ci` (`dev` keeps `oauth`), custom `generate_schema_name.sql` (`raw`/`staging`/`intermediate`/`marts`), and zero-dependency generic/singular tests (no `dbt_utils` / `packages.yml`) | Phase 3 dbt Marts |
+| **D-25** | dbt Contracts (Phase 3) | Staging 31-Column Base Contract & `dbt/seeds/` Type Enforcement | `stg_otp_flights` reads strictly the 31 base standardized columns (`load-raw` & `run` compatible); `dbt/seeds/` mirrors `reference/*.csv` with explicit `+column_types` (`bts_aircraft_type: string`, `as_of: date`, `seats_*: int64`) | Phase 3 dbt Marts |
+| **D-26** | Dimensional Modeling (Phase 3) | Conformed Dimension Primary Keys (`dim_airport`, `dim_carrier`, `dim_aircraft`) | Key `dim_airport` on `airport_code` (avoids `airport_id=14027` `PBI`/`DJT` collision), `dim_carrier` 1:1 on `op_carrier` (aggregating `L_CARRIER_HISTORY`), and `dim_aircraft` 1:1 on `tail_num` across multi-carrier regional tails | Phase 3 dbt Marts |
+| **D-27** | Marts & Scope (Phase 3) | `fct_flights` Partitioning, `agg_route_month` Domestic+Intl Scope & Full-Refresh Tables | Materialize `fct_flights` (`DAY` partition on `flight_date`, clustered `origin, dest, op_carrier`) and `agg_route_month` (UA-family Domestic `DU/DF` + Intl `IU/IF` with `data_granularity`) as `table`s (offline `dbt compile` safe) | Phase 3 dbt Marts |
+| **D-28** | Operational SQL Logic (Phase 3) | Deterministic Same-Day Tie-Breaking, Strict Backup Inequality & US Holiday Window Macro | Order route-day flights by `(crs_dep_time ASC, is_cancelled DESC, flight_num_mkt ASC, op_carrier ASC)`, use strict `crs_dep_time > current` for backups, and encode 6 deterministic US holiday windows in `holiday_calendar.sql` | Phase 3 dbt Marts |
 
 ---
 
@@ -182,4 +187,33 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 - **Context:** Portfolio transparency requires unambiguous separation of observed facts from derived lookups and modeled estimates, plus automated data quality gates.
 - **Decision:** Register every column in `COLUMN_CONFIDENCE_TIERS` (`actual`, `derived`, `estimated`), populate `record_confidence_summary`, and gate `python -m standby run` / `enrich` on all 5 Section 7 sanity checks (`SC-1`..`SC-5`), adapting `SC-2` and `SC-4` gracefully in `--sample` slice mode while enforcing strict thresholds on full runs.
 - **Rationale & Implications:** Verified on all `830,941` flights (`0` failures across `SC-1`..`SC-5`; `SC-4` system UA LF = `82.8945%`; `SC-3` max seat/dep diff = `5.68%`; `docs/phase2_enrichment_summary.json`).
+
+---
+
+## Phase 3 dbt Marts Decisions (`D-24` – `D-28`)
+
+### D-24: Offline BigQuery `oauth-secrets` CI Profile, Custom Schema Resolution & Zero-Dependency Tests
+- **Context:** `dbt-bigquery` `method: oauth` invokes `google.auth.default()` during `dbt compile`, which fails in secret-free GitHub Actions CI. Additionally, `dbt deps` / `dbt_utils` requires external network access to `hub.getdbt.com`, and dbt's default `generate_schema_name` concatenates `marts_staging` instead of targeting `staging`.
+- **Decision:** Configure `target: ci` in `dbt/profiles.yml` with `method: oauth-secrets` and `token: "{{ env_var('DBT_BQ_TOKEN', 'offline-ci-placeholder') }}"` (retaining `method: oauth` on `dev` for live BigQuery `dbt build`), implement `dbt/macros/generate_schema_name.sql` so datasets resolve directly to `raw`, `staging`, `intermediate`, and `marts`, and implement custom zero-dependency generic tests (`accepted_range`, `not_null_where`, `unique_combination_of_columns`) in `dbt/tests/generic/` without `packages.yml`.
+- **Rationale & Implications:** Enables `dbt parse`, `dbt compile`, and `dbt docs generate --empty-catalog` to run 100% offline in CI with zero GCP secrets or network package downloads.
+
+### D-25: Staging 31-Column Base Contract & `dbt/seeds/` Type Enforcement
+- **Context:** `python -m standby load-raw` loads 31 base standardized columns to `raw.otp_marketing_flights`, whereas `python -m standby run` writes 54+ enriched columns. Meanwhile, `dbt-core` requires seed paths inside `dbt/`, and purely numeric BTS aircraft type codes (`'627'`, `'530'`, `'888'`) in `tail_overrides.csv` and `faa_t100_crosswalk.csv` would default to `INT64` without explicit schema hints.
+- **Decision:** Have `stg_otp_flights.sql` select strictly the **31 base standardized columns** from `raw.otp_marketing_flights` (performing aircraft, T-100 LF, and modeled estimate enrichment inside `dbt/models/intermediate/`), copy `reference/*.csv` into `dbt/seeds/` with explicit `+column_types` (`bts_aircraft_type: string`, `as_of: date`, `seats_*: int64`) in `dbt/dbt_project.yml`, and enforce byte-for-byte parity between `dbt/seeds/*.csv` and `reference/*.csv` in `pytest`.
+- **Rationale & Implications:** Guarantees identical dbt execution whether `raw` is populated via `load-raw` or `run`, and prevents `INT64` vs. `STRING` join mismatches on `bts_aircraft_type`.
+
+### D-26: Conformed Dimension Primary Keys (`dim_airport`, `dim_carrier`, `dim_aircraft`)
+- **Context:** Auditing the full `830,941`-flight dataset uncovered three warehouse cardinality hazards: (1) DOT `airport_id = 14027` maps to both `PBI` and `DJT` in `L_AIRPORT`; (2) `L_CARRIER_HISTORY` contains `208` duplicate carrier codes (`250` extra historical-era rows); and (3) `76` regional aircraft records across `38` tails operated under multiple `op_carrier`s over `2019–2026`, whereas `tail_num` maps `1:1` to `(faa_manufacturer, faa_model, fleet_subtype, bts_aircraft_type, seats_config)`.
+- **Decision:** Key `dim_airport` on IATA `airport_code` (not `airport_id`), source `dim_carrier` `1:1` per `op_carrier` from `L_UNIQUE_CARRIERS` with `STRING_AGG` summary of `L_CARRIER_HISTORY`, and key `dim_aircraft` `1:1` on `tail_num` with aggregated `operating_carriers` and curated `source_url`/`as_of` provenance.
+- **Rationale & Implications:** Eliminates Cartesian fan-out and guarantees `0` duplicate primary keys across all 4 conformed dimensions (`dim_aircraft`, `dim_airport`, `dim_carrier`, `dim_date`).
+
+### D-27: `fct_flights` BigQuery Partitioning, `agg_route_month` Domestic + International Scope & Full-Refresh Tables
+- **Context:** `ORIGINAL_REQUEST.md` §8 requires `flight_date` partitioning and `origin, dest, op_carrier` clustering on `fct_flights`, plus domestic and international route/month visibility in `agg_route_month`. Additionally, `materialized='incremental'` triggers `adapter.get_relation(...)` BigQuery network calls during `dbt compile`.
+- **Decision:** Materialize `fct_flights` (`~831k` rows) as a full-refresh `table` partitioned by `DAY` on `flight_date` (expiry `NONE`) and clustered by `['origin', 'dest', 'op_carrier']` (exposing typed `CAST(NULL AS FLOAT64)` Phase 3 placeholders for `soi_historical`/`soi_planning`), and materialize `agg_route_month` (`~21k` rows) as a `table` clustered by `['origin', 'dest', 'op_carrier']` covering UA-family (`var('ua_family_carriers')`) across both Domestic (`DU`/`DF`) and International (`IU`/`IF`) T-100 segments with explicit `is_international` and `data_granularity` (`'flight_and_route_month'` vs. `'route_month_only_v1'`) labels.
+- **Rationale & Implications:** Preserves offline `dbt compile` safety, aligns with `load/bigquery.py`, and keeps international route-month boundaries transparent per `D-04`.
+
+### D-28: Deterministic Same-Day Tie-Breaking, Strict Backup Inequality & US Holiday Window Macro
+- **Context:** Eight `(origin, dest, flight_date, crs_dep_time)` cells (`18` rows) in the full dataset contain multiple departures scheduled at the exact same minute (including cancelled + recovery flights), and Phase 4 SOI requires shared, leakage-free displacement/backup prep metrics and holiday calendar definitions across Python and BigQuery SQL.
+- **Decision:** Order route-day flights deterministically by `(crs_dep_time ASC, is_cancelled DESC, flight_num_mkt ASC, op_carrier ASC)`, compute `weighted_displacement_hist` with intermediate-flight absorption $0.75^{\Delta k}$ ($\Delta k = \text{seq}_i - \text{seq}_j - 1$), count `remaining_scheduled_backups` and `remaining_performed_backups` using strict `j.crs_dep_time > i.crs_dep_time` (no self-count on tied times), and define 6 deterministic US holiday travel windows in `dbt/macros/holiday_calendar.sql` (`Christmas / New Year` Dec 20–Jan 3, `Thanksgiving` Wed–Mon, `Memorial Day` Fri–Tue, `Independence Day` Jul 1–7, `Labor Day` Fri–Tue, `Spring Break` Mar 10–Apr 7).
+- **Rationale & Implications:** Guarantees bit-for-bit parity between Phase 3 SQL marts and Phase 4 Python SOI scoring.
 

@@ -16,10 +16,59 @@ clean-targets:
   - "dbt_packages"
 
 vars:
-  default_hub: "ORD"
-  analysis_years: [2019, 2023, 2024, 2025, 2026]
+  hubs: ["ORD"]
+  years: [2019, 2023, 2024, 2025, 2026]
   marketing_carrier: "UA"
+  ua_family_carriers: ["UA", "OO", "YX", "YV", "G7", "C5", "ZW", "EV", "AX"]
+  shared_cpa_carriers: ["OO", "YX", "YV", "ZW"]
+  tsa_damping_alpha: 0.35
+  tsa_multiplier_min: 0.80
+  tsa_multiplier_max: 1.20
+  min_faa_tc_max_seats: 20
 
 models:
   united_standby_analytics:
-    +materialized: view
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts
+
+seeds:
+  united_standby_analytics:
+    +schema: raw
+    seat_config:
+      +column_types:
+        subtype: string
+        op_carrier_group: string
+        seats_total: int64
+        seats_premium: int64
+        seats_economy: int64
+        source_url: string
+        as_of: date
+        notes: string
+    tail_overrides:
+      +column_types:
+        tail_num: string
+        op_carrier: string
+        subtype: string
+        bts_aircraft_type: string
+        seats_total: int64
+        seats_premium: int64
+        seats_economy: int64
+        source_url: string
+        as_of: date
+        override_reason: string
+    faa_t100_crosswalk:
+      +column_types:
+        faa_mfr: string
+        faa_model: string
+        op_carrier: string
+        subtype: string
+        bts_aircraft_type: string
+        bts_description: string
+        notes: string

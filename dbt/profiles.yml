@@ -3,8 +3,18 @@ united_standby_analytics:
   outputs:
     ci:
       type: bigquery
+      method: oauth-secrets
+      token: "{{ env_var('DBT_BQ_TOKEN', 'offline-ci-placeholder') }}"
+      project: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
+      dataset: marts
+      location: US
+      threads: 4
+      job_execution_timeout_seconds: 300
+      job_retries: 1
+    dev:
+      type: bigquery
       method: oauth
-      project: united-standby-analytics
+      project: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
       dataset: marts
       location: US
       threads: 4
