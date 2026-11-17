@@ -62,9 +62,41 @@ united-standby-analytics/
 
 | Phase | PR | Milestone & Deliverables | Status |
 |---|---|---|---|
-| **Phase 0** | **PR #1** | **Phase 0 Validation Report + Architecture Proposal** (`docs/phase0_validation_report.md`, `docs/data_acquisition.md`, `docs/decisions.md`, `notebooks/00_phase0_validation.ipynb`) — *Stop Gate 1* | **Complete (Awaiting Gate 1 Review)** |
-| **Phase 1** | PR #2 | Ingestion + Checksummed `data/manifest.csv` + `pandera` Schemas + BigQuery `raw` Batch Load | Planned |
+| **Phase 0** | **PR #1** | **Phase 0 Validation Report + Architecture Proposal** (`docs/phase0_validation_report.md`, `docs/data_acquisition.md`, `docs/decisions.md`, `notebooks/00_phase0_validation.ipynb`) — *Stop Gate 1* | **Merged (`main`)** |
+| **Phase 1** | **PR #2** | **Ingestion + Checksummed `data/manifest.csv` + `data/sample/` + `pandera` Schemas + BigQuery `raw` Batch Load + GitHub Actions CI + `dbt parse` Stub** | **Complete (PR #2 Open)** |
 | **Phase 2** | PR #3 | Flight-Level Enrichment + Curated Reference Tables (`reference/`) — *Stop Gate 2* | Planned |
-| **Phase 3** | PR #4 | `dbt Core` (`staging` → `intermediate` → `marts`) + Schema Tests + GitHub Actions CI | Planned |
+| **Phase 3** | PR #4 | `dbt Core` (`staging` → `intermediate` → `marts`) + Schema Tests | Planned |
 | **Phase 4** | PR #5 | Standby Opportunity Index (`soi_historical` + `soi_planning`) + Validation Suite — *Stop Gate 3* | Planned |
 | **Phase 5** | PR #6 | Tableau Public Extracts (`exports/tableau/`) + Dashboard Spec + Final README & Data Dictionary | Planned |
+
+---
+
+## Quickstart (Local & CI Reproduction)
+
+```bash
+# 1. Create pinned virtual environment from uv.lock
+make setup
+
+# 2. Verify raw & sample checksum manifests
+make manifest
+# or directly:
+.venv/bin/python -m standby verify-manifest --manifest data/sample/manifest.csv
+.venv/bin/python -m standby verify-manifest --manifest data/manifest.csv
+
+# 3. Run code quality, unit tests (against data/sample/), and offline dbt parse
+make lint
+make format-check
+make test
+make dbt-parse
+
+# 4. Run end-to-end sample dry-run (CI parity, <5s, no GCP credentials required)
+make ingest-sample
+# or directly:
+.venv/bin/python -m standby run --hub ORD --years 2019,2023-2026 --sample --dry-run
+
+# 5. Run full pipeline against data/raw/ (auto-falls back to data/processed/full/ Parquet if ADC absent)
+.venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
+# Other CLI subcommands:
+.venv/bin/python -m standby ingest --hub ORD --years 2019,2023-2026 --sample
+.venv/bin/python -m standby load-raw --hub ORD --years 2019,2023-2026 --sample --dry-run
+```

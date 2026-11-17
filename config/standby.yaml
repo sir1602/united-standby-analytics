@@ -1,0 +1,68 @@
+project:
+  name: united-standby-analytics
+  version: "0.1.0"
+
+scope:
+  hubs:
+    - ORD
+  default_hub: ORD
+  marketing_carriers:
+    - UA
+  operating_carriers:
+    mainline:
+      - UA
+    express:
+      - OO  # SkyWest Airlines
+      - YX  # Republic Airline
+      - G7  # GoJet Airlines
+      - ZW  # Air Wisconsin Airlines (2019 & H1 2023)
+      - EV  # ExpressJet Airlines (2019 baseline)
+      - AX  # Trans States Airlines (2019 baseline)
+      - C5  # CommuteAir
+      - YV  # Mesa Airlines
+  years:
+    - 2019
+    - 2023
+    - 2024
+    - 2025
+    - 2026
+
+paths:
+  raw_dir: data/raw
+  sample_dir: data/sample
+  manifest_path: data/manifest.csv
+  sample_manifest_path: data/sample/manifest.csv
+  processed_dir: data/processed
+  reference_dir: reference
+  exports_dir: exports/tableau
+
+hour_blocks:
+  early:     { start_hour: 5,  end_hour: 8,  load_multiplier: 0.96 }
+  morning:   { start_hour: 8,  end_hour: 11, load_multiplier: 1.03 }
+  midday:    { start_hour: 11, end_hour: 14, load_multiplier: 1.00 }
+  afternoon: { start_hour: 14, end_hour: 17, load_multiplier: 1.02 }
+  evening:   { start_hour: 17, end_hour: 20, load_multiplier: 1.04 }
+  late:      { start_hour: 20, end_hour: 5,  load_multiplier: 0.94 }
+
+index_weights:
+  open_seats: 0.50
+  displacement_pressure: 0.20
+  backup_options: 0.20
+  day_holiday_demand: 0.10
+
+bigquery:
+  project_id: united-standby-analytics
+  location: US
+  partition_expiration_ms: null  # Strictly NONE (billing-enabled project, never Sandbox)
+  datasets:
+    raw: raw
+    staging: staging
+    intermediate: intermediate
+    marts: marts
+  tables:
+    otp_marketing_flights: otp_marketing_flights
+    t100_segments: t100_segments
+    faa_aircraft_registry: faa_aircraft_registry
+    faa_acftref: faa_acftref
+    tsa_daily_throughput: tsa_daily_throughput
+    bts_lookups: bts_lookups
