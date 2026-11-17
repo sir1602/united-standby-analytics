@@ -388,3 +388,75 @@ def test_enriched_flights_bigquery_partitioning_clustering_and_parquet(
     assert job_config.time_partitioning.field == "flight_date"
     assert job_config.time_partitioning.expiration_ms is None
     assert list(job_config.clustering_fields) == ["origin", "dest", "op_carrier"]
+
+
+def test_cli_score_and_validate_index_respect_hub_and_years_on_processed_parquet(
+    repo_root: Path,
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """`score` / `validate-index` scope processed Parquets to `--hub` / `--years` and re-score by default."""
+    import json
+
+    runner = CliRunner()
+
+    def _isolated_load_config(**kwargs):
+        cfg = load_config(repo_root=repo_root, **kwargs)
+        cfg.processed_dir = tmp_path / "processed"
+        return cfg
+
+    monkeypatch.setattr("standby.cli.load_config", _isolated_load_config)
+
+    res_run = runner.invoke(
+        main,
+        ["run", "--hub", "ORD", "--years", "2019,2023-2026", "--sample", "--dry-run"],
+    )
+    assert res_run.exit_code == 0, res_run.output
+    otp_parquet = tmp_path / "processed" / "sample" / "otp_marketing_flights.parquet"
+    processed = pd.read_parquet(otp_parquet)
+    n_2024 = int((processed["year"] == 2024).sum())
+    assert 0 < n_2024 < len(processed)
+    # Stored 2024 planning scores were trained on 2019, so re-scoring 2024 alone must change them.
+    assert processed.loc[processed["year"] == 2024, "soi_planning"].notna().any()
+
+    # `score` writes back to the processed Parquet, so it refuses to silently drop other years.
+    res_score = runner.invoke(
+        main, ["score", "--hub", "ORD", "--years", "2024", "--sample", "--from-processed"]
+    )
+    assert res_score.exit_code != 0
+    assert "flights outside --hub ORD --years [2024]" in res_score.output
+    assert len(pd.read_parquet(otp_parquet)) == len(processed)
+
+    # `validate-index` validates only the requested years and re-scores them (2024 becomes the
+    # minimum year, so its soi_planning must be NULL).
+    summary = tmp_path / "val_2024.json"
+    res_val = runner.invoke(
+        main,
+        [
+            "validate-index",
+            "--hub",
+            "ORD",
+            "--years",
+            "2024",
+            "--sample",
+            "--summary-path",
+            str(summary),
+        ],
+    )
+    assert res_val.exit_code == 0, res_val.output
+    assert f"SOI VALIDATION PASSED: flights={n_2024}" in res_val.output
+    report = json.loads(summary.read_text(encoding="utf-8"))
+    assert report["metadata"]["years"] == [2024]
+    assert report["coverage_and_invariants"]["min_year_soi_planning_non_null"] == 0
+
+    # `--reuse-scores` validates the stored (2019-trained) scores, which breaks the min-year invariant.
+    res_reuse = runner.invoke(
+        main, ["validate-index", "--hub", "ORD", "--years", "2024", "--sample", "--reuse-scores"]
+    )
+    assert res_reuse.exit_code != 0
+    assert "Leakage invariant failed: min_year=2024" in str(res_reuse.exception)
+
+    # A hub with no processed flights fails loudly instead of validating ORD data.
+    res_hub = runner.invoke(main, ["validate-index", "--hub", "DEN", "--sample"])
+    assert res_hub.exit_code != 0
+    assert "has no flights for --hub DEN" in res_hub.output

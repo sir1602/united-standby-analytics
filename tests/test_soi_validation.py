@@ -14,7 +14,7 @@ from standby.enrichment.load_factor import LF_SOURCE_L1
 from standby.scoring import score_flights
 from standby.scoring.holidays import is_holiday_window, thanksgiving_date
 from standby.validation.sanity import check_soi_bounds
-from standby.validation.soi_validation import run_soi_validation
+from standby.validation.soi_validation import _pillar_2_gate_failures, run_soi_validation
 
 
 def _build_synthetic_multiyear_dataset() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -237,3 +237,58 @@ def test_check_soi_bounds_catches_out_of_range_scores() -> None:
     assert res.status == "FAIL"
     assert res.details["violations_by_column"]["soi_historical"] == 1
     assert res.details["violations_by_column"]["soi_planning"] == 1
+
+
+def test_soi_validation_reports_empty_face_validity_windows_as_gate_failures(
+    tmp_path: Path,
+) -> None:
+    """Empty Pillar 2 windows (e.g. a year range with no Nov/Dec) fail the gate instead of crashing."""
+    flights_df, t100_df, tsa_df = _build_synthetic_multiyear_dataset()
+    no_nov_dec = flights_df[~pd.to_datetime(flights_df["flight_date"]).dt.month.isin([11, 12])]
+    scored_df = score_flights(no_nov_dec, t100_df=t100_df, tsa_df=tsa_df)
+    assert len(scored_df) >= 500  # full (non-sample) gates must run
+    summary_path = tmp_path / "phase4_validation.json"
+
+    report = run_soi_validation(
+        flights_df=scored_df,
+        t100_df=t100_df,
+        tsa_df=tsa_df,
+        sample_mode=False,
+        summary_path=summary_path,
+        raise_on_failure=False,
+    )
+
+    assert report.passed is False
+    assert summary_path.is_file()
+    empty = "window(s) ['christmas_peak', 'thanksgiving_sunday']"
+    assert any(f.startswith("Pillar 2 soi_historical") and empty in f for f in report.gate_failures)
+    assert any(f.startswith("Pillar 2 soi_planning") and empty in f for f in report.gate_failures)
+
+
+def _pillar_2_stub(welch_p_value: float | None) -> dict:
+    hist_means = {
+        "late_jan_midweek": 80.0,
+        "all_flights_baseline": 70.0,
+        "spring_break": 60.0,
+        "christmas_peak": 55.0,
+        "thanksgiving_sunday": 50.0,
+    }
+    window_stats = {name: {"n": 100, "mean": mean} for name, mean in hist_means.items()}
+    return {
+        "soi_historical": window_stats,
+        "soi_planning": window_stats,
+        "statistical_separation_tests": {
+            "late_jan_vs_thanksgiving_sunday": {
+                "soi_planning": {"welch_p_value": welch_p_value},
+            }
+        },
+    }
+
+
+def test_pillar_2_gate_treats_underflowed_zero_p_value_as_significant() -> None:
+    """A Welch p-value that underflows to `0.0` passes the separation gate; `None` fails it."""
+    assert _pillar_2_gate_failures(_pillar_2_stub(0.0)) == []
+    assert _pillar_2_gate_failures(_pillar_2_stub(1e-12)) == []
+    assert _pillar_2_gate_failures(_pillar_2_stub(None)) == [
+        "Pillar 2 soi_planning Late-Jan > Thanksgiving Sunday separation failed"
+    ]
