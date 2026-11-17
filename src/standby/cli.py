@@ -170,6 +170,53 @@ def load_raw_cmd(hub: str | None, years: str | None, sample: bool, dry_run: bool
     )
 
 
+@main.command("enrich")
+@click.option(
+    "--hub",
+    default=None,
+    help="Origin hub IATA code (defaults to `config/standby.yaml` default_hub).",
+)
+@click.option(
+    "--years",
+    default=None,
+    callback=_validate_years_option,
+    help="Years to process (comma/range syntax, e.g. 2019,2023-2026; defaults to YAML config).",
+)
+@click.option("--sample", is_flag=True, default=False, help="Run against data/sample/ for fast CI.")
+@click.option(
+    "--summary-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path to write Phase 2 enrichment summary JSON.",
+)
+def enrich_cmd(
+    hub: str | None,
+    years: str | None,
+    sample: bool,
+    summary_path: Path | None,
+) -> None:
+    """Verify manifest, ingest & validate sources, and run Phase 2 enrichment + sanity checks."""
+    from standby.enrichment.pipeline import run_enrichment_pipeline
+
+    cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
+    verify_manifest(cfg.active_manifest_path, repo_root=cfg.repo_root)
+    ingested = ingest_all_sources(cfg)
+    validate_all_ingested(ingested, config=cfg)
+    enrichment_result = run_enrichment_pipeline(
+        ingested=ingested,
+        config=cfg,
+        summary_path=summary_path,
+    )
+    fm = enrichment_result.faa_match_metrics
+    sr = enrichment_result.sanity_report
+    click.echo(
+        f"ENRICHMENT PASSED: flights={len(enrichment_result.enriched_flights):,}, "
+        f"raw_faa_unmatched={fm.raw_faa_master_plus_dereg_commercial_unmatched_rate_non_null:.4%}, "
+        f"post_override_unmatched_performed={fm.post_override_unmatched_performed}, "
+        f"sanity_warnings={sr.warnings_count}, sanity_failures={sr.failures_count}"
+    )
+
+
 @main.command("run")
 @click.option(
     "--hub",
@@ -189,7 +236,19 @@ def load_raw_cmd(hub: str | None, years: str | None, sample: bool, dry_run: bool
     default=False,
     help="Skip remote BigQuery load and write local Parquet artifacts.",
 )
-def run_cmd(hub: str | None, years: str | None, sample: bool, dry_run: bool) -> None:
+@click.option(
+    "--summary-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path to write Phase 2 enrichment summary JSON.",
+)
+def run_cmd(
+    hub: str | None,
+    years: str | None,
+    sample: bool,
+    dry_run: bool,
+    summary_path: Path | None,
+) -> None:
     """End-to-end pipeline entry point: manifest gate -> ingest -> validate -> enrich -> load."""
     cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=dry_run)
     logger.info(
@@ -206,12 +265,34 @@ def run_cmd(hub: str | None, years: str | None, sample: bool, dry_run: bool) -> 
     validated_counts = validate_all_ingested(ingested, config=cfg)
 
     # 4. Run Phase 2 flight-level enrichment & sanity checks if reference tables are present
+    enrichment_summary_msg = ""
     enrichment_pkg = Path(__file__).parent / "enrichment" / "pipeline.py"
     if enrichment_pkg.is_file() and (cfg.reference_dir / "seat_config.csv").is_file():
         from standby.enrichment.pipeline import run_enrichment_pipeline
 
-        enrichment_result = run_enrichment_pipeline(ingested=ingested, config=cfg)
+        enrichment_result = run_enrichment_pipeline(
+            ingested=ingested,
+            config=cfg,
+            summary_path=summary_path,
+        )
         ingested["otp_marketing_flights"] = enrichment_result.enriched_flights
+        fm = enrichment_result.faa_match_metrics
+        sr = enrichment_result.sanity_report
+        logger.info(
+            "Enrichment metrics & sanity summary",
+            extra={
+                "extra_fields": {
+                    "raw_faa_unmatched_rate_non_null": fm.raw_faa_master_plus_dereg_commercial_unmatched_rate_non_null,
+                    "post_override_unmatched_performed": fm.post_override_unmatched_performed,
+                    "sanity_passed": sr.passed,
+                    "sanity_warnings": sr.warnings_count,
+                }
+            },
+        )
+        enrichment_summary_msg = (
+            f", enrichment_unmatched_performed={fm.post_override_unmatched_performed}, "
+            f"sanity_warnings={sr.warnings_count}"
+        )
 
     # 5. Batch-load standardized/enriched tables to BigQuery raw dataset (or local Parquet in dry-run)
     load_results = load_all_raw_tables(tables=ingested, config=cfg)
@@ -219,4 +300,5 @@ def run_cmd(hub: str | None, years: str | None, sample: bool, dry_run: bool) -> 
     click.echo(
         f"PIPELINE RUN SUCCEEDED: manifest_files={manifest_report.verified_entries}, "
         f"validated_tables={validated_counts}, loaded_tables={len(load_results)}"
+        f"{enrichment_summary_msg}"
     )

@@ -66,3 +66,43 @@ bigquery:
     faa_acftref: faa_acftref
     tsa_daily_throughput: tsa_daily_throughput
     bts_lookups: bts_lookups
+
+enrichment:
+  tsa_damping_alpha: 0.35
+  tsa_multiplier_bounds: [0.80, 1.20]
+  min_faa_tc_max_seats: 20
+  commercial_mfr_prefixes:
+    - BOEING
+    - AIRBUS
+    - EMBRAER
+    - YABORA
+    - BOMBARDIER
+    - CANADAIR
+    - MHI RJ
+  dedicated_express_carriers:
+    - G7
+    - EV
+    - AX
+    - C5
+  shared_cpa_express_carriers:
+    - OO
+    - YX
+    - YV
+    - ZW  # Multi-brand starting 2023; dedicated UA in 2019
+  hour_block_multipliers:
+    early: 0.96
+    morning: 1.03
+    midday: 1.00
+    afternoon: 1.02
+    evening: 1.04
+    late: 0.94
+
+sanity_checks:
+  departure_reconciliation_tolerance: 0.10
+  seats_per_dep_warn_tolerance: 0.10
+  seats_per_dep_fail_tolerance: 0.15
+  system_lf_warn_bounds: [0.80, 0.86]
+  system_lf_fail_bounds: [0.75, 0.90]
+  sample_lf_fail_bounds: [0.70, 0.92]
+  sample_min_t100_rows: 500
+

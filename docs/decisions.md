@@ -1,10 +1,10 @@
 # Technical Decisions & Assumptions Log (`docs/decisions.md`)
 
-Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records both the **13 baseline architectural decisions (`D-01` through `D-13`)** and the **5 empirical technical decisions (`D-14` through `D-18`)** established during Phase 0 validation.
+Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, and the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**.
 
 ---
 
-## Summary Table (`D-01` – `D-18`)
+## Summary Table (`D-01` – `D-23`)
 
 | ID | Category | Decision Title | Choice Made | Status |
 |---|---|---|---|---|
@@ -26,6 +26,11 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-16** | Enrichment (Phase 0) | Two-Tier FAA Registry Lookup (`MASTER.txt` → `DEREG.txt`) + Commercial Manufacturer Filter & `80`-Tail Overrides | Filter `MASTER.txt` & `DEREG.txt` to commercial airliner manufacturers (`BOEING`, `AIRBUS%`, `EMBRAER%`, `YABORA%`, `BOMBARDIER%`, `CANADAIR%`, `MHI RJ%`) + resolve `80` historical regional tails (`43` unmatched + `37` N-number-reused) in `tail_overrides.csv` | Phase 0 Empirical |
 | **D-17** | Enrichment & Reconciliation (Phase 0) | Combined T-100 Segment (`FMG`) & 3-Tier `lf_source` Hierarchy + Multi-Brand Regional Handling | Use `T_T100_SEGMENT_ALL_CARRIER` (`CLASS = 'F'`), resolve LF via Tier 1 (`carrier_route_month_aircraft`) → Tier 2 (`carrier_route_month`) → Tier 3 (`route_month`), and flag shared multi-brand regional spokes (`OO`, `YX`) | Phase 0 Empirical |
 | **D-18** | Data Hygiene (Phase 0) | Local `hhmm` Zero-Padding, `'2400'` Normalization & Conditional Null Constraints | Pad `hhmm` to 4 chars, normalize `'2400'` → `'0000'` (`late` hour block), enforce conditional non-null rules on `is_cancelled == 0`, and set `soi_historical = NULL` on cancelled/unmatched flights | Phase 0 Empirical |
+| **D-19** | Enrichment (Phase 2) | Strict 3-Tier Aircraft Precedence, 1:1 Mapping & Stearman Seat Floor | Enforce `TAIL_OVERRIDE → FAA_MASTER → FAA_DEREG` 1:1 lookup with commercial manufacturer filter + `faa_tc_max_seats >= 20` (`9,263` collisions rejected) | Phase 2 Enrichment |
+| **D-20** | Reference Tables (Phase 2) | Curated Seat Config, Crosswalk & Tail Overrides | Maintain `seat_config.csv` (`31` subtypes), `faa_t100_crosswalk.csv` (`56` rules), and `tail_overrides.csv` (`152` tails), achieving `100.0000%` performed flight resolution | Phase 2 Enrichment |
+| **D-21** | Enrichment (Phase 2) | 3-Tier Domestic T-100 LF Hierarchy & Zero Silent Imputation | Join domestic T-100 via `CARRIER_ROUTE_MONTH_TYPE` → `CARRIER_ROUTE_MONTH` → `ROUTE_MONTH` and leave all `est_*` columns `NULL` on missing/unmatched T-100 | Phase 2 Enrichment |
+| **D-22** | Enrichment (Phase 2) | Base Estimates vs. Modeled Demand Adjustments | Keep base estimates (`est_load_factor`, `est_passengers`, `est_open_seats`) separate from modeled TSA/hour-block adjustments (`est_*_adjusted`) | Phase 2 Enrichment |
+| **D-23** | Validation (Phase 2) | Column Confidence-Tier Registry & Section 7 Sanity Checks (`SC-1`..`SC-5`) | Register every column in `COLUMN_CONFIDENCE_TIERS` and gate pipeline runs on `SC-1`..`SC-5` (`0` failures across `830,941` flights) | Phase 2 Enrichment |
 
 ---
 
@@ -148,3 +153,33 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
   2. Condition `pandera` and `dbt` `not_null` tests for `dep_time`, `dep_delay_min`, and `tail_num` on `is_cancelled == 0`, and for `arr_time`, `arr_delay_min`, and `actual_elapsed_time_min` on `is_cancelled == 0 AND is_diverted == 0`.
   3. Set `soi_historical = NULL` whenever `is_cancelled == 1`.
 - **Rationale & Implications:** Eliminates false schema-validation failures on cancelled and diverted flights while maintaining `100.0000%` completeness checks on performed non-diverted flights (`812,457` rows).
+
+---
+
+## Phase 2 Enrichment Decisions (`D-19` – `D-23`)
+
+### D-19: Strict 3-Tier Aircraft Precedence, 1:1 Mapping & Stearman Seat-Floor Guard (`faa_tc_max_seats >= 20`)
+- **Context:** Inspecting `MASTER.txt` and `DEREG.txt` revealed `49` dual-registry N-numbers present in both tables, including `16` retired 1940s–1950s `BOEING A75N1` / `E75` Stearman 2-seat biplanes in `DEREG.txt` whose N-numbers were later reassigned to modern United mainline Boeing/Airbus jets in `MASTER.txt`. A naive `MASTER + DEREG` merge would produce Cartesian duplicates (`>830,941` rows) or resolve modern jets to 2-seat biplanes.
+- **Decision:** Enforce strict 1:1 dictionary-keyed lookup precedence **`TAIL_OVERRIDE` → `FAA_MASTER` → `FAA_DEREG`** (latest `cancel_date`) with a commercial manufacturer prefix filter **plus** `faa_tc_max_seats >= 20` (`config.enrichment.min_faa_tc_max_seats`).
+- **Rationale & Implications:** Preserves exact `830,941` row cardinality and rejects `9,263` low-seat registry collisions with zero Stearman or drone contamination.
+
+### D-20: Curated Reference Tables (`31` Subtypes, `56` Crosswalk Rules, `152` Tail Overrides)
+- **Context:** Raw FAA `MASTER` + `DEREG` leaves `2.1626%` of non-null flights (`2.1458%` of performed flights) unmatched due to historical 2019 regional N-number reassignments/purges, and FAA `ACFTREF` lacks sub-fleet cabin splits (`777-222` Domestic HD `364` vs. Intl Polaris `276`, `767-300ER` High-J `167` vs. `203`, `757-200` `169` vs. `176`).
+- **Decision:** Maintain `reference/seat_config.csv` (`31` subtypes: `21` mainline + `10` express), `reference/faa_t100_crosswalk.csv` (`56` `(faa_mfr, faa_model, op_carrier)` rules verified 100% against `L_AIRCRAFT_TYPE.csv`), and `reference/tail_overrides.csv` (`152` tails: `72` mainline multi-config + `80` historical regional tails).
+- **Rationale & Implications:** Resolves **`814,847 / 814,847` (`100.0000%`)** of performed flights (`0` unmatched performed; only `1` cancelled `OO` dispatcher typo `NTCR2` across all `822,719` non-null tail rows).
+
+### D-21: 3-Tier Domestic T-100 Load Factor Hierarchy & Zero Silent Imputation
+- **Context:** T-100 reports monthly carrier/route/aircraft-type traffic, with occasional carrier/type splits or post-T-100 OTP months.
+- **Decision:** Join domestic T-100 (`CLASS = 'F'`, `DATA_SOURCE IN ('DU', 'DF')`) via `CARRIER_ROUTE_MONTH_TYPE` (`814,497` flights / `98.02%`) → `CARRIER_ROUTE_MONTH` (`16,430` / `1.98%`) → `ROUTE_MONTH` (`14` / `0.002%`), flag shared multi-brand regional spokes (`is_shared_regional_spoke`, `76,446` flights), and strictly leave `est_load_factor` and all `est_*` columns `NULL` whenever `t100_available == False` or `lf_source == 'UNMATCHED'`.
+- **Rationale & Implications:** Eliminates silent imputation bias and preserves exact provenance in `lf_source`.
+
+### D-22: Separation of Base Estimates vs. Modeled Demand Adjustments
+- **Context:** Monthly T-100 load factors smooth out daily holiday surges and time-of-day bank peaks.
+- **Decision:** Keep base estimates (`est_load_factor`, `est_passengers`, `est_open_seats`) strictly untouched alongside separate modeled adjustments (`tsa_demand_multiplier` with YAML-driven $\alpha=0.35$ and $[0.80, 1.20]$ bounds, `hour_block_multiplier`, `est_lf_adjusted`, `est_passengers_adjusted`, `est_open_seats_adjusted`).
+- **Rationale & Implications:** Allows downstream analysts and `dbt` marts to inspect both raw T-100 monthly baselines and demand-adjusted estimates independently.
+
+### D-23: Explicit Column Confidence-Tier Registry & Blocking Section 7 Sanity Checks (`SC-1`..`SC-5`)
+- **Context:** Portfolio transparency requires unambiguous separation of observed facts from derived lookups and modeled estimates, plus automated data quality gates.
+- **Decision:** Register every column in `COLUMN_CONFIDENCE_TIERS` (`actual`, `derived`, `estimated`), populate `record_confidence_summary`, and gate `python -m standby run` / `enrich` on all 5 Section 7 sanity checks (`SC-1`..`SC-5`), adapting `SC-2` and `SC-4` gracefully in `--sample` slice mode while enforcing strict thresholds on full runs.
+- **Rationale & Implications:** Verified on all `830,941` flights (`0` failures across `SC-1`..`SC-5`; `SC-4` system UA LF = `82.8945%`; `SC-3` max seat/dep diff = `5.68%`; `docs/phase2_enrichment_summary.json`).
+
