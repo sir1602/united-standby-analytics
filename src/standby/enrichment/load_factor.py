@@ -8,6 +8,8 @@ from typing import Any
 
 import pandas as pd
 
+from standby.config import DEFAULT_UA_FAMILY_CARRIERS
+
 logger = logging.getLogger("standby.enrichment.load_factor")
 
 LF_SOURCE_L1 = "CARRIER_ROUTE_MONTH_TYPE"
@@ -15,9 +17,6 @@ LF_SOURCE_L2 = "CARRIER_ROUTE_MONTH"
 LF_SOURCE_L3 = "ROUTE_MONTH"
 LF_SOURCE_UNMATCHED = "UNMATCHED"
 
-DEFAULT_UA_FAMILY_CARRIERS: frozenset[str] = frozenset(
-    {"UA", "OO", "YX", "YV", "G7", "C5", "ZW", "EV", "AX"}
-)
 DEFAULT_SHARED_CPA_CARRIERS: frozenset[str] = frozenset({"OO", "YX", "YV", "ZW"})
 
 

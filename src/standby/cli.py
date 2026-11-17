@@ -275,30 +275,250 @@ def run_cmd(
             config=cfg,
             summary_path=summary_path,
         )
-        ingested["otp_marketing_flights"] = enrichment_result.enriched_flights
+
+        from standby.scoring import score_flights
+        from standby.validation.sanity import (
+            SanityCheckError,
+            check_sc5_missing_t100_null_invariant,
+            check_soi_bounds,
+        )
+
+        scored_df = score_flights(
+            enriched_df=enrichment_result.enriched_flights,
+            t100_df=ingested["t100_segments"],
+            tsa_df=ingested["tsa_daily_throughput"],
+            config=cfg,
+        )
+        post_sc5 = check_sc5_missing_t100_null_invariant(scored_df)
+        post_bounds = check_soi_bounds(scored_df)
+        if post_sc5.status == "FAIL":
+            raise SanityCheckError(f"Post-SOI SC-5 failed: {post_sc5.message}")
+        if post_bounds.status == "FAIL":
+            raise SanityCheckError(f"Post-SOI bounds failed: {post_bounds.message}")
+
+        ingested["otp_marketing_flights"] = scored_df
         fm = enrichment_result.faa_match_metrics
         sr = enrichment_result.sanity_report
         logger.info(
-            "Enrichment metrics & sanity summary",
+            "Enrichment & Phase 4 SOI scoring summary",
             extra={
                 "extra_fields": {
                     "raw_faa_unmatched_rate_non_null": fm.raw_faa_master_plus_dereg_commercial_unmatched_rate_non_null,
                     "post_override_unmatched_performed": fm.post_override_unmatched_performed,
                     "sanity_passed": sr.passed,
                     "sanity_warnings": sr.warnings_count,
+                    "soi_historical_scored": int(scored_df["soi_historical"].notna().sum()),
+                    "soi_planning_scored": int(scored_df["soi_planning"].notna().sum()),
                 }
             },
         )
         enrichment_summary_msg = (
             f", enrichment_unmatched_performed={fm.post_override_unmatched_performed}, "
-            f"sanity_warnings={sr.warnings_count}"
+            f"sanity_warnings={sr.warnings_count}, "
+            f"soi_hist_scored={int(scored_df['soi_historical'].notna().sum())}, "
+            f"soi_plan_scored={int(scored_df['soi_planning'].notna().sum())}"
         )
 
-    # 5. Batch-load standardized/enriched tables to BigQuery raw dataset (or local Parquet in dry-run)
+    # 5. Batch-load standardized/enriched/scored tables to BigQuery raw dataset (or local Parquet in dry-run)
     load_results = load_all_raw_tables(tables=ingested, config=cfg)
 
     click.echo(
         f"PIPELINE RUN SUCCEEDED: manifest_files={manifest_report.verified_entries}, "
         f"validated_tables={validated_counts}, loaded_tables={len(load_results)}"
         f"{enrichment_summary_msg}"
+    )
+
+
+@main.command("score")
+@click.option(
+    "--hub",
+    default=None,
+    help="Origin hub IATA code (defaults to `config/standby.yaml` default_hub).",
+)
+@click.option(
+    "--years",
+    default=None,
+    callback=_validate_years_option,
+    help="Years to score (comma/range syntax, e.g. 2019,2023-2026; defaults to YAML config).",
+)
+@click.option("--sample", is_flag=True, default=False, help="Score data/sample/ for fast CI.")
+@click.option(
+    "--from-processed/--recompute",
+    default=True,
+    show_default=True,
+    help="Read existing processed Parquets when present, or recompute from raw sources.",
+)
+@click.option(
+    "--summary-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path to write JSON scoring summary.",
+)
+def score_cmd(
+    hub: str | None,
+    years: str | None,
+    sample: bool,
+    from_processed: bool,
+    summary_path: Path | None,
+) -> None:
+    """Compute Phase 4 `soi_historical` and `soi_planning` and write scored Parquet."""
+    import json
+
+    import pandas as pd
+
+    from standby.load.bigquery import prepare_dataframe_for_bigquery
+    from standby.scoring import score_flights
+    from standby.validation.sanity import (
+        SanityCheckError,
+        check_sc5_missing_t100_null_invariant,
+        check_soi_bounds,
+    )
+
+    cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
+    mode_dir = cfg.processed_dir / ("sample" if cfg.sample_mode else "full")
+    otp_pq = mode_dir / "otp_marketing_flights.parquet"
+    t100_pq = mode_dir / "t100_segments.parquet"
+    tsa_pq = mode_dir / "tsa_daily_throughput.parquet"
+
+    if from_processed and otp_pq.is_file() and t100_pq.is_file() and tsa_pq.is_file():
+        enriched_df = pd.read_parquet(otp_pq)
+        t100_df = pd.read_parquet(t100_pq)
+        tsa_df = pd.read_parquet(tsa_pq)
+    else:
+        from standby.enrichment.pipeline import run_enrichment_pipeline
+
+        verify_manifest(cfg.active_manifest_path, repo_root=cfg.repo_root)
+        ingested = ingest_all_sources(cfg)
+        validate_all_ingested(ingested, config=cfg)
+        enrichment_result = run_enrichment_pipeline(ingested=ingested, config=cfg)
+        enriched_df = enrichment_result.enriched_flights
+        t100_df = ingested["t100_segments"]
+        tsa_df = ingested["tsa_daily_throughput"]
+
+    scored_df = score_flights(
+        enriched_df=enriched_df,
+        t100_df=t100_df,
+        tsa_df=tsa_df,
+        config=cfg,
+    )
+    sc5 = check_sc5_missing_t100_null_invariant(scored_df)
+    bounds = check_soi_bounds(scored_df)
+    if sc5.status == "FAIL":
+        raise SanityCheckError(f"SC-5 failed after scoring: {sc5.message}")
+    if bounds.status == "FAIL":
+        raise SanityCheckError(f"SOI bounds failed after scoring: {bounds.message}")
+
+    mode_dir.mkdir(parents=True, exist_ok=True)
+    prepared = prepare_dataframe_for_bigquery(scored_df, "otp_marketing_flights")
+    prepared.to_parquet(otp_pq, index=False)
+
+    hist_cnt = int(scored_df["soi_historical"].notna().sum())
+    plan_cnt = int(scored_df["soi_planning"].notna().sum())
+    if summary_path is not None:
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_path.write_text(
+            json.dumps(
+                {
+                    "total_flights": int(len(scored_df)),
+                    "soi_historical_scored": hist_cnt,
+                    "soi_planning_scored": plan_cnt,
+                    "sc5": sc5.to_dict(),
+                    "bounds": bounds.to_dict(),
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+    click.echo(
+        f"SCORING PASSED: flights={len(scored_df):,}, "
+        f"soi_historical_scored={hist_cnt:,}, soi_planning_scored={plan_cnt:,}, "
+        f"output={otp_pq}"
+    )
+
+
+@main.command("validate-index")
+@click.option(
+    "--hub",
+    default=None,
+    help="Origin hub IATA code (defaults to `config/standby.yaml` default_hub).",
+)
+@click.option(
+    "--years",
+    default=None,
+    callback=_validate_years_option,
+    help="Years to validate (comma/range syntax, e.g. 2019,2023-2026; defaults to YAML config).",
+)
+@click.option("--sample", is_flag=True, default=False, help="Validate data/sample/ for fast CI.")
+@click.option(
+    "--summary-path",
+    "--output",
+    "summary_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Path to write Phase 4 validation JSON summary.",
+)
+def validate_index_cmd(
+    hub: str | None,
+    years: str | None,
+    sample: bool,
+    summary_path: Path | None,
+) -> None:
+    """Run Section 6 validation suite (backtest, face-validity, weight sensitivity, SC-5)."""
+    import pandas as pd
+
+    from standby.validation.soi_validation import run_soi_validation
+
+    cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
+    mode_dir = cfg.processed_dir / ("sample" if cfg.sample_mode else "full")
+    resolved_summary = summary_path or (
+        mode_dir / "phase4_validation_summary.json"
+        if cfg.sample_mode
+        else cfg.repo_root / "docs" / "phase4_validation_summary.json"
+    )
+
+    otp_pq = mode_dir / "otp_marketing_flights.parquet"
+    t100_pq = mode_dir / "t100_segments.parquet"
+    tsa_pq = mode_dir / "tsa_daily_throughput.parquet"
+
+    if otp_pq.is_file() and t100_pq.is_file() and tsa_pq.is_file():
+        flights_df = pd.read_parquet(otp_pq)
+        t100_df = pd.read_parquet(t100_pq)
+        tsa_df = pd.read_parquet(tsa_pq)
+    else:
+        from standby.enrichment.pipeline import run_enrichment_pipeline
+        from standby.scoring import score_flights
+
+        verify_manifest(cfg.active_manifest_path, repo_root=cfg.repo_root)
+        ingested = ingest_all_sources(cfg)
+        validate_all_ingested(ingested, config=cfg)
+        enrichment_result = run_enrichment_pipeline(ingested=ingested, config=cfg)
+        t100_df = ingested["t100_segments"]
+        tsa_df = ingested["tsa_daily_throughput"]
+        flights_df = score_flights(
+            enriched_df=enrichment_result.enriched_flights,
+            t100_df=t100_df,
+            tsa_df=tsa_df,
+            config=cfg,
+        )
+
+    report = run_soi_validation(
+        flights_df=flights_df,
+        t100_df=t100_df,
+        tsa_df=tsa_df,
+        config=cfg,
+        sample_mode=cfg.sample_mode,
+        summary_path=resolved_summary,
+        raise_on_failure=True,
+    )
+    holdout_rho = report.pillar_1_time_based_backtest["fixed_holdout"].get("spearman_rho")
+    wf_rho = report.pillar_1_time_based_backtest["expanding_walk_forward"]["combined"].get(
+        "spearman_rho"
+    )
+    click.echo(
+        f"SOI VALIDATION PASSED: flights={report.metadata['total_flights']:,}, "
+        f"sample_mode={report.metadata['sample_mode']}, "
+        f"holdout_rho={holdout_rho}, walk_forward_rho={wf_rho}, "
+        f"summary={resolved_summary}"
     )

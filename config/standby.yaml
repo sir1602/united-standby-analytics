@@ -106,3 +106,17 @@ sanity_checks:
   sample_lf_fail_bounds: [0.70, 0.92]
   sample_min_t100_rows: 500
 
+scoring:
+  open_seats_abs_cap: 25.0
+  open_seats_pct_cap: 0.30
+  open_seats_abs_weight: 0.50
+  disp_diversion_weight: 0.50
+  disp_decay_base: 0.75
+  disp_hist_cap: 2.0
+  disp_plan_prior_factor: 0.65
+  disp_plan_cap: 0.25
+  disp_plan_min_obs: 5
+  backup_max_flights: 6
+  demand_holiday_adder: 0.10
+  demand_ratio_min: 0.65
+  demand_ratio_max: 1.35

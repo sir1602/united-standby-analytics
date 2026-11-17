@@ -29,7 +29,7 @@ disrupted_flights as (
         route_day_seq,
         case
             when is_cancelled then 1.0
-            when is_diverted then 0.5
+            when is_diverted then {{ var('disp_diversion_weight', 0.50) }}
             else 0.0
         end as disruption_weight
     from ordered_flights
@@ -41,7 +41,10 @@ earlier_disruptions as (
         i.flight_id,
         coalesce(
             sum(
-                j.disruption_weight * pow(0.75, cast(i.route_day_seq - j.route_day_seq - 1 as float64))
+                j.disruption_weight * pow(
+                    {{ var('disp_hist_decay', 0.75) }},
+                    cast(i.route_day_seq - j.route_day_seq - 1 as float64)
+                )
             ),
             0.0
         ) as weighted_displacement_hist,
@@ -55,9 +58,10 @@ earlier_disruptions as (
     group by i.flight_id
 ),
 
-later_backups as (
+same_day_strict_counts as (
     select
         i.flight_id,
+        countif(j.crs_dep_time < i.crs_dep_time) as prior_strict_scheduled_count,
         countif(j.crs_dep_time > i.crs_dep_time) as remaining_scheduled_backups,
         countif(j.crs_dep_time > i.crs_dep_time and not j.is_cancelled) as remaining_performed_backups
     from ordered_flights as i
@@ -75,6 +79,7 @@ select
     o.dest,
     o.route_day_seq,
     o.route_day_seq - 1 as prior_scheduled_count,
+    coalesce(lb.prior_strict_scheduled_count, 0) as prior_strict_scheduled_count,
     coalesce(ed.prior_disruption_count, 0) as prior_disruption_count,
     coalesce(ed.weighted_displacement_hist, 0.0) as weighted_displacement_hist,
     coalesce(lb.remaining_scheduled_backups, 0) as remaining_scheduled_backups,
@@ -82,5 +87,5 @@ select
 from ordered_flights as o
 left join earlier_disruptions as ed
     on o.flight_id = ed.flight_id
-left join later_backups as lb
+left join same_day_strict_counts as lb
     on o.flight_id = lb.flight_id

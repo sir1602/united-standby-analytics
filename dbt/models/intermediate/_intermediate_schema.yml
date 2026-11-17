@@ -113,6 +113,12 @@ models:
           - not_null
           - accepted_range:
               min_value: 0
+      - name: prior_strict_scheduled_count
+        description: "Leakage-free count of strictly earlier (j.crs_dep_time < i.crs_dep_time) scheduled departures."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0
       - name: weighted_displacement_hist
         description: "Decayed sum of earlier same-day cancellations (1.0) and diversions (0.5)."
         data_tests:
@@ -131,3 +137,75 @@ models:
           - not_null
           - accepted_range:
               min_value: 0
+
+  - name: int_flights_soi_scored
+    description: >
+      Computes Phase 4 `soi_historical` and leakage-free expanding `soi_planning` (0-100)
+      plus all 8 component sub-scores (`s_open_*`, `s_disp_*`, `s_backup_*`, `s_demand_*`),
+      enforcing SC-5 NULL gates and `2019` planning NULL invariants.
+    columns:
+      - name: flight_id
+        description: "Primary key preserved 1:1 from int_flight_estimates."
+        data_tests:
+          - unique
+          - not_null
+      - name: s_open_hist
+        description: "Historical open-seat sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_disp_hist
+        description: "Historical displacement-pressure sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_backup_hist
+        description: "Historical backup-options sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_demand_hist
+        description: "Historical day/holiday demand sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: soi_historical
+        description: "Composite historical Standby Opportunity Index [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_open_plan
+        description: "Leakage-free planning open-seat sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_disp_plan
+        description: "Leakage-free planning displacement-pressure sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_backup_plan
+        description: "Leakage-free planning backup-options sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: s_demand_plan
+        description: "Leakage-free planning day/holiday demand sub-score [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
+      - name: soi_planning
+        description: "Composite leakage-free planning Standby Opportunity Index [0, 100]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 100.0
