@@ -69,7 +69,10 @@ models:
   - name: stg_t100_segments
     description: >
       Standardized BTS T-100 Segment rows filtered to service_class='F', configured hubs,
-      and analysis years. Covers both Domestic (DU/DF) and International (IU/IF) segments.
+      and analysis years, aggregated to the unique
+      (year, month, op_carrier, origin, dest, bts_aircraft_type, data_source) grain
+      (collapsing multi-aircraft_config and scheduled/extra-section sub-rows).
+      Covers both Domestic (DU/DF) and International (IU/IF) segments.
     data_tests:
       - unique_combination_of_columns:
           combination_of_columns:

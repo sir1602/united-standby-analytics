@@ -36,7 +36,7 @@ with source as (
         distance_miles,
         confidence_tier
     from {{ source('raw', 'otp_marketing_flights') }}
-    where upper(trim(origin)) in ('{{ var("hubs") | join("', '") }}')
+    where upper(trim(origin)) in ('{{ var("hubs") | map("upper") | join("', '") }}')
       and cast(year as int64) in ({{ var("years") | join(", ") }})
       and upper(trim(mkt_carrier)) = upper('{{ var("marketing_carrier") }}')
 ),

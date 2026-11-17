@@ -107,7 +107,7 @@ def test_dbt_compile_custom_vars_override_sql(repo_root: Path, tmp_path: Path) -
         [
             "compile",
             "--vars",
-            '{"hubs": ["ORD"], "years": [2024]}',
+            '{"hubs": ["ord", "den"], "years": [2024]}',
             "--target-path",
             str(target_dir),
         ],
@@ -115,19 +115,20 @@ def test_dbt_compile_custom_vars_override_sql(repo_root: Path, tmp_path: Path) -
     )
     assert res.returncode == 0, f"Custom vars compile failed:\n{res.stdout}\n{res.stderr}"
 
-    compiled_stg = (
-        target_dir
-        / "compiled"
-        / "united_standby_analytics"
-        / "models"
-        / "staging"
-        / "stg_otp_flights.sql"
-    )
-    assert compiled_stg.is_file()
-    sql_text = compiled_stg.read_text(encoding="utf-8")
-    assert "in ('ORD')" in sql_text
-    assert "in (2024)" in sql_text
-    assert "2019, 2023" not in sql_text
+    compiled_models = target_dir / "compiled" / "united_standby_analytics" / "models"
+    for rel_path in (
+        Path("staging") / "stg_otp_flights.sql",
+        Path("staging") / "stg_t100_segments.sql",
+        Path("marts") / "dim_airport.sql",
+    ):
+        compiled_file = compiled_models / rel_path
+        assert compiled_file.is_file()
+        sql_text = compiled_file.read_text(encoding="utf-8")
+        assert "in ('ORD', 'DEN')" in sql_text
+
+    stg_otp_sql = (compiled_models / "staging" / "stg_otp_flights.sql").read_text(encoding="utf-8")
+    assert "in (2024)" in stg_otp_sql
+    assert "2019, 2023" not in stg_otp_sql
 
 
 def test_dbt_manifest_models_schemas_partitioning_and_tests(
@@ -369,32 +370,71 @@ def _build_sample_sqlite_db(
         FROM base;
 
         CREATE VIEW stg_t100_segments AS
+        WITH source AS (
+            SELECT
+                CAST(year AS INTEGER) AS year,
+                CAST(quarter AS INTEGER) AS quarter,
+                CAST(month AS INTEGER) AS month,
+                UPPER(TRIM(op_carrier)) AS op_carrier,
+                TRIM(carrier_name) AS carrier_name,
+                UPPER(TRIM(origin)) AS origin,
+                CAST(origin_airport_id AS INTEGER) AS origin_airport_id,
+                UPPER(TRIM(origin_country)) AS origin_country,
+                UPPER(TRIM(dest)) AS dest,
+                CAST(dest_airport_id AS INTEGER) AS dest_airport_id,
+                UPPER(TRIM(dest_country)) AS dest_country,
+                TRIM(CAST(bts_aircraft_type AS TEXT)) AS bts_aircraft_type,
+                CAST(aircraft_group AS INTEGER) AS aircraft_group,
+                CAST(aircraft_config AS INTEGER) AS aircraft_config,
+                UPPER(TRIM(service_class)) AS service_class,
+                UPPER(TRIM(data_source)) AS data_source,
+                is_international,
+                CAST(departures_scheduled AS REAL) AS departures_scheduled,
+                CAST(departures_performed AS REAL) AS departures_performed,
+                CAST(seats AS REAL) AS seats,
+                CAST(passengers AS REAL) AS passengers,
+                CAST(distance_miles AS REAL) AS distance_miles,
+                COALESCE(NULLIF(LOWER(TRIM(confidence_tier)), ''), 'actual') AS confidence_tier
+            FROM raw_t100_segments
+            WHERE UPPER(TRIM(service_class)) = 'F'
+              AND UPPER(TRIM(origin)) IN ('ORD')
+              AND CAST(year AS INTEGER) IN (2019, 2023, 2024, 2025, 2026)
+        )
         SELECT
-            CAST(year AS INTEGER) AS year,
-            CAST(quarter AS INTEGER) AS quarter,
-            CAST(month AS INTEGER) AS month,
-            UPPER(TRIM(op_carrier)) AS op_carrier,
-            TRIM(carrier_name) AS carrier_name,
-            UPPER(TRIM(origin)) AS origin,
-            CAST(origin_airport_id AS INTEGER) AS origin_airport_id,
-            UPPER(TRIM(origin_country)) AS origin_country,
-            UPPER(TRIM(dest)) AS dest,
-            CAST(dest_airport_id AS INTEGER) AS dest_airport_id,
-            UPPER(TRIM(dest_country)) AS dest_country,
-            TRIM(CAST(bts_aircraft_type AS TEXT)) AS bts_aircraft_type,
-            UPPER(TRIM(service_class)) AS service_class,
-            UPPER(TRIM(data_source)) AS data_source,
-            is_international,
-            CASE WHEN UPPER(TRIM(op_carrier)) IN ('UA','OO','YX','YV','G7','C5','ZW','EV','AX') THEN 1 ELSE 0 END AS is_ua_family,
-            departures_scheduled,
-            departures_performed,
-            seats,
-            passengers,
-            distance_miles
-        FROM raw_t100_segments
-        WHERE UPPER(TRIM(service_class)) = 'F'
-          AND UPPER(TRIM(origin)) IN ('ORD')
-          AND CAST(year AS INTEGER) IN (2019, 2023, 2024, 2025, 2026);
+            year,
+            MAX(quarter) AS quarter,
+            month,
+            op_carrier,
+            MAX(carrier_name) AS carrier_name,
+            origin,
+            MAX(origin_airport_id) AS origin_airport_id,
+            MAX(origin_country) AS origin_country,
+            dest,
+            MAX(dest_airport_id) AS dest_airport_id,
+            MAX(dest_country) AS dest_country,
+            bts_aircraft_type,
+            MAX(aircraft_group) AS aircraft_group,
+            MAX(aircraft_config) AS aircraft_config,
+            MAX(service_class) AS service_class,
+            data_source,
+            MAX(is_international) AS is_international,
+            MAX(CASE WHEN op_carrier IN ('UA','OO','YX','YV','G7','C5','ZW','EV','AX') THEN 1 ELSE 0 END) AS is_ua_family,
+            SUM(departures_scheduled) AS departures_scheduled,
+            SUM(departures_performed) AS departures_performed,
+            SUM(seats) AS seats,
+            SUM(passengers) AS passengers,
+            MAX(distance_miles) AS distance_miles,
+            CASE
+                WHEN SUM(seats) > 0.0 THEN MIN(1.0, MAX(0.0, SUM(passengers) * 1.0 / SUM(seats)))
+                ELSE NULL
+            END AS load_factor,
+            CASE
+                WHEN SUM(departures_performed) > 0.0 THEN SUM(seats) * 1.0 / SUM(departures_performed)
+                ELSE NULL
+            END AS seats_per_departure,
+            MAX(confidence_tier) AS confidence_tier
+        FROM source
+        GROUP BY year, month, op_carrier, origin, dest, bts_aircraft_type, data_source;
 
         CREATE VIEW stg_faa_aircraft AS
         SELECT n_number, serial_number, mfr_mdl_code, year_mfr, registry_source, cancel_date
@@ -930,5 +970,259 @@ def test_sqlite_sql_parity_with_python_enrichment_and_mart_invariants(
         )
         assert dim_date["date_day"].is_unique
         assert set(sql_fct["flight_date"]).issubset(set(dim_date["date_day"]))
+
+        stg_t100 = pd.read_sql_query("SELECT * FROM stg_t100_segments", conn)
+        assert not stg_t100.empty
+        assert not stg_t100.duplicated(
+            subset=[
+                "year",
+                "month",
+                "op_carrier",
+                "origin",
+                "dest",
+                "bts_aircraft_type",
+                "data_source",
+            ]
+        ).any()
+    finally:
+        conn.close()
+
+
+def test_stg_t100_segments_aggregates_duplicate_subsegments(
+    repo_root: Path,
+    sample_ingested: dict[str, pd.DataFrame],
+) -> None:
+    """Adversarial duplicate T-100 sub-segments collapse cleanly to 0 grain duplicates with exact sums."""
+    mutated = {k: v.copy() for k, v in sample_ingested.items()}
+    t100 = mutated["t100_segments"].copy()
+
+    # Pick an existing UA DU row in sample_ingested and split it into scheduled + extra-section (0 sched) rows,
+    # plus inject a KL IF multi-aircraft_config (1 vs 3) international pair matching real BTS T-100 quirks.
+    ua_du_mask = (t100["op_carrier"] == "UA") & (t100["data_source"] == "DU")
+    assert ua_du_mask.any(), "Expected at least one UA DU segment in sample_ingested"
+    ua_template = t100[ua_du_mask].iloc[0].copy()
+
+    ua_sched = ua_template.copy()
+    ua_sched["departures_scheduled"] = 42.0
+    ua_sched["departures_performed"] = 40.0
+    ua_sched["seats"] = 8000.0
+    ua_sched["passengers"] = 6400.0
+
+    ua_extra = ua_template.copy()
+    ua_extra["departures_scheduled"] = 0.0
+    ua_extra["departures_performed"] = 2.0
+    ua_extra["seats"] = 400.0
+    ua_extra["passengers"] = 320.0
+
+    # Replace all rows matching that exact 7-col key with the two sub-rows
+    key_cols = [
+        "year",
+        "month",
+        "op_carrier",
+        "origin",
+        "dest",
+        "bts_aircraft_type",
+        "data_source",
+    ]
+    same_ua_key = pd.Series(True, index=t100.index)
+    for col in key_cols:
+        same_ua_key &= t100[col] == ua_template[col]
+    t100 = t100[~same_ua_key].copy()
+
+    kl_cfg1 = pd.Series(
+        {
+            "year": 2019,
+            "quarter": 1,
+            "month": 1,
+            "op_carrier": "KL",
+            "carrier_name": "Klm Royal Dutch Airlines",
+            "origin": "ORD",
+            "origin_airport_id": 13930,
+            "origin_country": "US",
+            "dest": "AMS",
+            "dest_airport_id": 10292,
+            "dest_country": "NL",
+            "bts_aircraft_type": "819",
+            "aircraft_group": 8,
+            "aircraft_config": 1,
+            "service_class": "F",
+            "data_source": "IF",
+            "is_international": True,
+            "departures_scheduled": 0.0,
+            "departures_performed": 1.0,
+            "seats": 408.0,
+            "passengers": 261.0,
+            "distance_miles": 4120.0,
+            "confidence_tier": "actual",
+        }
+    )
+    kl_cfg3 = kl_cfg1.copy()
+    kl_cfg3["aircraft_config"] = 3
+    kl_cfg3["departures_performed"] = 20.0
+    kl_cfg3["seats"] = 5360.0
+    kl_cfg3["passengers"] = 3852.0
+
+    mutated["t100_segments"] = pd.concat(
+        [t100, pd.DataFrame([ua_sched, ua_extra, kl_cfg1, kl_cfg3])],
+        ignore_index=True,
+    )
+
+    cfg = load_config(repo_root=repo_root, sample_mode=True, dry_run=True)
+    py_result = enrich_flights(
+        otp_df=mutated["otp_marketing_flights"],
+        t100_df=mutated["t100_segments"],
+        faa_registry_df=mutated["faa_aircraft_registry"],
+        faa_acftref_df=mutated["faa_acftref"],
+        tsa_df=mutated["tsa_daily_throughput"],
+        reference_dir=cfg.reference_dir,
+        config=cfg,
+        raise_on_sanity_failure=False,
+    )
+
+    conn = _build_sample_sqlite_db(repo_root, mutated)
+    try:
+        stg_t100 = pd.read_sql_query("SELECT * FROM stg_t100_segments", conn)
+        assert not stg_t100.duplicated(subset=key_cols).any(), (
+            "stg_t100_segments must have 0 duplicate 7-col grain rows"
+        )
+
+        # Verify UA DU extra-section sub-rows aggregated with exact sums and recomputed metrics
+        ua_row = stg_t100[
+            (stg_t100["year"] == int(ua_template["year"]))
+            & (stg_t100["month"] == int(ua_template["month"]))
+            & (stg_t100["op_carrier"] == "UA")
+            & (stg_t100["origin"] == str(ua_template["origin"]))
+            & (stg_t100["dest"] == str(ua_template["dest"]))
+            & (stg_t100["bts_aircraft_type"] == str(ua_template["bts_aircraft_type"]))
+            & (stg_t100["data_source"] == "DU")
+        ]
+        assert len(ua_row) == 1
+        assert float(ua_row.iloc[0]["departures_scheduled"]) == pytest.approx(42.0)
+        assert float(ua_row.iloc[0]["departures_performed"]) == pytest.approx(42.0)
+        assert float(ua_row.iloc[0]["seats"]) == pytest.approx(8400.0)
+        assert float(ua_row.iloc[0]["passengers"]) == pytest.approx(6720.0)
+        assert float(ua_row.iloc[0]["load_factor"]) == pytest.approx(6720.0 / 8400.0)
+        assert float(ua_row.iloc[0]["seats_per_departure"]) == pytest.approx(8400.0 / 42.0)
+
+        # Verify KL IF multi-aircraft_config sub-rows collapsed cleanly
+        kl_row = stg_t100[
+            (stg_t100["year"] == 2019)
+            & (stg_t100["month"] == 1)
+            & (stg_t100["op_carrier"] == "KL")
+            & (stg_t100["dest"] == "AMS")
+            & (stg_t100["bts_aircraft_type"] == "819")
+            & (stg_t100["data_source"] == "IF")
+        ]
+        assert len(kl_row) == 1
+        assert float(kl_row.iloc[0]["departures_performed"]) == pytest.approx(21.0)
+        assert float(kl_row.iloc[0]["seats"]) == pytest.approx(5768.0)
+        assert float(kl_row.iloc[0]["passengers"]) == pytest.approx(4113.0)
+        assert float(kl_row.iloc[0]["load_factor"]) == pytest.approx(4113.0 / 5768.0)
+        assert float(kl_row.iloc[0]["seats_per_departure"]) == pytest.approx(5768.0 / 21.0)
+
+        # Verify downstream int_t100_load_factors and agg_route_month parity
+        sql_fct = pd.read_sql_query("SELECT * FROM fct_flights", conn)
+        assert len(sql_fct) == len(py_result.enriched_flights) == 80
+        py_df = py_result.enriched_flights.copy()
+        py_df["flight_date_str"] = py_df["flight_date"].astype(str).str.slice(0, 10)
+        merged = py_df.merge(
+            sql_fct,
+            left_on=[
+                "flight_date_str",
+                "mkt_carrier",
+                "flight_num_mkt",
+                "origin",
+                "dest",
+                "crs_dep_time",
+            ],
+            right_on=[
+                "flight_date",
+                "mkt_carrier",
+                "flight_num_mkt",
+                "origin",
+                "dest",
+                "crs_dep_time",
+            ],
+            suffixes=("_py", "_sql"),
+            how="inner",
+        )
+        assert len(merged) == 80
+        assert np.allclose(
+            merged["est_load_factor_py"],
+            merged["est_load_factor_sql"],
+            rtol=1e-9,
+            atol=1e-9,
+            equal_nan=True,
+        )
+
+        agg_df = pd.read_sql_query("SELECT * FROM agg_route_month", conn)
+        assert not agg_df.duplicated(
+            subset=["year", "month", "op_carrier", "origin", "dest", "is_international"]
+        ).any()
+    finally:
+        conn.close()
+
+
+def test_sc1_singular_test_catches_null_open_seats(
+    dbt_compiled_manifest: dict,
+    repo_root: Path,
+) -> None:
+    """`assert_sc1_passenger_bounds.sql` catches rows where open_seats is NULL despite non-null passengers."""
+    compiled_test = (
+        repo_root
+        / "dbt"
+        / "target"
+        / "compiled"
+        / "united_standby_analytics"
+        / "tests"
+        / "assert_sc1_passenger_bounds.sql"
+    )
+    assert compiled_test.is_file()
+    raw_sql = compiled_test.read_text(encoding="utf-8")
+    sqlite_sql = raw_sql.replace("`united-standby-analytics`.`marts`.`fct_flights`", "fct_flights")
+
+    conn = sqlite3.connect(":memory:")
+    try:
+        conn.execute(
+            """
+            CREATE TABLE fct_flights (
+                flight_id TEXT,
+                flight_date TEXT,
+                op_carrier TEXT,
+                origin TEXT,
+                dest TEXT,
+                seats_config INTEGER,
+                est_load_factor REAL,
+                est_passengers INTEGER,
+                est_open_seats INTEGER,
+                est_lf_adjusted REAL,
+                est_passengers_adjusted INTEGER,
+                est_open_seats_adjusted INTEGER
+            )
+            """
+        )
+        conn.executemany(
+            "INSERT INTO fct_flights VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                ("ok", "2024-01-01", "UA", "ORD", "DEN", 150, 0.80, 120, 30, 0.80, 120, 30),
+                (
+                    "null_base",
+                    "2024-01-01",
+                    "UA",
+                    "ORD",
+                    "DEN",
+                    150,
+                    0.80,
+                    120,
+                    None,
+                    0.80,
+                    120,
+                    30,
+                ),
+                ("null_adj", "2024-01-01", "UA", "ORD", "DEN", 150, 0.80, 120, 30, 0.80, 120, None),
+            ],
+        )
+        hits = pd.read_sql_query(sqlite_sql, conn)
+        assert set(hits["flight_id"]) == {"null_base", "null_adj"}
     finally:
         conn.close()

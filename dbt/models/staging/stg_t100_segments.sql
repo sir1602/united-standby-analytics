@@ -27,35 +27,43 @@ with source as (
         coalesce(nullif(lower(trim(confidence_tier)), ''), 'actual') as confidence_tier
     from {{ source('raw', 't100_segments') }}
     where upper(trim(service_class)) = 'F'
-      and upper(trim(origin)) in ('{{ var("hubs") | join("', '") }}')
+      and upper(trim(origin)) in ('{{ var("hubs") | map("upper") | join("', '") }}')
       and cast(year as int64) in ({{ var("years") | join(", ") }})
 )
 
 select
     year,
-    quarter,
+    max(quarter) as quarter,
     month,
     op_carrier,
-    carrier_name,
+    max(carrier_name) as carrier_name,
     origin,
-    origin_airport_id,
-    origin_country,
+    max(origin_airport_id) as origin_airport_id,
+    max(origin_country) as origin_country,
     dest,
-    dest_airport_id,
-    dest_country,
+    max(dest_airport_id) as dest_airport_id,
+    max(dest_country) as dest_country,
     bts_aircraft_type,
-    aircraft_group,
-    aircraft_config,
-    service_class,
+    max(aircraft_group) as aircraft_group,
+    max(aircraft_config) as aircraft_config,
+    max(service_class) as service_class,
     data_source,
-    is_international,
-    op_carrier in ('{{ var("ua_family_carriers") | join("', '") }}') as is_ua_family,
-    departures_scheduled,
-    departures_performed,
-    seats,
-    passengers,
-    distance_miles,
-    least(1.0, greatest(0.0, safe_divide(passengers, nullif(seats, 0.0)))) as load_factor,
-    safe_divide(seats, nullif(departures_performed, 0.0)) as seats_per_departure,
-    confidence_tier
+    max(is_international) as is_international,
+    max(op_carrier in ('{{ var("ua_family_carriers") | join("', '") }}')) as is_ua_family,
+    sum(departures_scheduled) as departures_scheduled,
+    sum(departures_performed) as departures_performed,
+    sum(seats) as seats,
+    sum(passengers) as passengers,
+    max(distance_miles) as distance_miles,
+    least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as load_factor,
+    safe_divide(sum(seats), nullif(sum(departures_performed), 0.0)) as seats_per_departure,
+    max(confidence_tier) as confidence_tier
 from source
+group by
+    year,
+    month,
+    op_carrier,
+    origin,
+    dest,
+    bts_aircraft_type,
+    data_source

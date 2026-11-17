@@ -27,7 +27,8 @@ or (
     seats_config is not null
     and est_passengers is not null
     and (
-        est_passengers < 0
+        est_open_seats is null
+        or est_passengers < 0
         or est_passengers > seats_config
         or est_open_seats < 0
         or est_open_seats > seats_config
@@ -38,7 +39,8 @@ or (
     seats_config is not null
     and est_passengers_adjusted is not null
     and (
-        est_passengers_adjusted < 0
+        est_open_seats_adjusted is null
+        or est_passengers_adjusted < 0
         or est_passengers_adjusted > seats_config
         or est_open_seats_adjusted < 0
         or est_open_seats_adjusted > seats_config

@@ -60,7 +60,7 @@ select
     coalesce(c.observed_airport_id, lkp.airport_id) as airport_id,
     lkp.airport_name,
     coalesce(c.country_code, 'US') as country_code,
-    c.airport_code in ('{{ var("hubs") | join("', '") }}') as is_hub,
+    c.airport_code in ('{{ var("hubs") | map("upper") | join("', '") }}') as is_hub,
     c.has_domestic_service,
     c.has_international_service,
     'actual' as confidence_tier
