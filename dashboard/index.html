@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>United Standby Opportunity Explorer (ORD Hub) — Interactive BI Dashboard</title>
+  <meta name="description" content="Interactive Standby Opportunity Index (SOI) analytics dashboard for Chicago O'Hare (ORD) United Airlines and United Express departures across 830,941 flights, 348 destinations, and 56 months (2019, 2023–2026)." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-top">
+      <div class="brand-block">
+        <div class="hub-mark" aria-hidden="true">ORD</div>
+        <div class="brand-titles">
+          <h1>United Standby Opportunity Explorer</h1>
+          <div class="brand-sub" id="header-scope-sub">
+            Chicago O'Hare (ORD) · 830,941 Flights · 348 Destinations · 2019 &amp; 2023–2026 (56 Months)
+          </div>
+        </div>
+      </div>
+
+      <div class="header-actions" role="region" aria-label="Global Dashboard Filters">
+        <div class="segmented" role="group" aria-label="Standby Opportunity Index Mode">
+          <button id="mode-plan" type="button" class="active" data-mode="plan" title="Leakage-free advance planning score fitted strictly on prior years (2023–2026)">
+            Planning (Ex-Ante)
+          </button>
+          <button id="mode-hist" type="button" data-mode="hist" title="Post-hoc operational audit score using realized flight-day outcomes (2019, 2023–2026)">
+            Historical (Post-Hoc)
+          </button>
+        </div>
+
+        <select id="filter-year" class="control-select" aria-label="Filter by Year">
+          <option value="ALL">All Years (2019, 2023–2026)</option>
+          <option value="POST" selected>Post-COVID (2023–2026)</option>
+          <option value="2026">2026 (Jan–Aug)</option>
+          <option value="2025">2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2019">2019 (Pre-COVID Baseline)</option>
+        </select>
+
+        <select id="filter-carrier-group" class="control-select" aria-label="Filter by Carrier Group">
+          <option value="ALL">All UA Family (Mainline + Express)</option>
+          <option value="MAINLINE">United Mainline (UA)</option>
+          <option value="EXPRESS">United Express Partners</option>
+        </select>
+
+        <button id="btn-theme" type="button" class="btn-ghost" aria-label="Toggle light and dark theme">
+          <span id="theme-label">Dark</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="disclaimer-strip">
+      <div class="disclaimer-inner">
+        <div>
+          <strong>0–100 Heuristic — NOT a Boarding Probability.</strong>
+          Hour/day differences reflect BTS OTP operational signals &amp; modeled TSA/hour-block adjustments, not observed flight-level loads.
+          International routes use T-100 route-month granularity (<code>v1</code>).
+        </div>
+        <button id="btn-methodology" type="button" class="link-btn">Disclaimers &amp; Formula</button>
+      </div>
+    </div>
+
+    <nav class="nav-bar" role="tablist" aria-label="Dashboard Views">
+      <button id="tab-network" class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-network" data-tab="network">
+        1. Network &amp; Route Explorer
+      </button>
+      <button id="tab-timing" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-timing" data-tab="timing">
+        2. Timing, Heatmap &amp; Seasonality
+      </button>
+      <button id="tab-fleet" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-fleet" data-tab="fleet">
+        3. Fleet, Carriers &amp; Regional CPA
+      </button>
+      <button id="tab-flights" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-flights" data-tab="flights">
+        4. Flight-Level Scorer
+      </button>
+      <button id="tab-validation" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-validation" data-tab="validation">
+        5. Empirical Validation &amp; BigQuery Audit
+      </button>
+    </nav>
+  </header>
+
+  <main class="main-wrap">
+    <div id="context-banner" class="context-banner" role="status"></div>
+
+    <!-- Global KPI Strip -->
+    <section class="kpi-grid" aria-label="Key Performance Indicators" id="kpi-grid">
+      <div class="kpi-card"><div class="loading-state">Loading analytics...</div></div>
+    </section>
+
+    <!-- TAB 1: NETWORK & ROUTE EXPLORER -->
+    <section id="panel-network" class="tab-panel active" role="tabpanel" aria-labelledby="tab-network">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">ORD Hub-and-Spoke Route Network (348 Destinations)</h2>
+            <p class="panel-subtitle">
+              277 domestic stations (flight-level SOI + T-100) and 71 international stations (T-100 route-month only, v1). Click any bubble to inspect its monthly history.
+            </p>
+          </div>
+          <div class="panel-controls">
+            <div class="segmented" role="group" aria-label="Map Region">
+              <button id="map-na" type="button" class="active" data-map-view="na">North America</button>
+              <button id="map-global" type="button" data-map-view="global">Global Network</button>
+            </div>
+            <select id="map-scope" class="control-select" aria-label="Map Scope Filter">
+              <option value="ALL">All Routes (348)</option>
+              <option value="DOM">Domestic Only (277)</option>
+              <option value="INTL">International v1 Only (71)</option>
+            </select>
+          </div>
+        </div>
+        <div id="route-map-container" class="map-frame"></div>
+        <div class="map-legend">
+          <div class="legend-group">
+            <span class="legend-item"><span class="swatch circle" style="background: var(--soi-high)"></span> High Opportunity (SOI ≥ 70 / LF &lt; 78%)</span>
+            <span class="legend-item"><span class="swatch circle" style="background: var(--soi-mod)"></span> Moderate (SOI 55–69 / LF 78–83%)</span>
+            <span class="legend-item"><span class="swatch circle" style="background: var(--soi-tight)"></span> Tight (SOI 45–54 / LF 83–88%)</span>
+            <span class="legend-item"><span class="swatch circle" style="background: var(--soi-low)"></span> Constrained (SOI &lt; 45 / LF ≥ 88%)</span>
+          </div>
+          <div>Bubble area scales with performed departures · Dashed arcs indicate International v1 (T-100 route-month)</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Destination Route Leaderboard</h2>
+            <p class="panel-subtitle" id="route-table-subtitle">
+              Full-period aggregates across all 348 ORD destinations. Click any row for monthly trend drill-down.
+            </p>
+          </div>
+          <div class="panel-controls">
+            <input id="route-search" type="search" class="search-input" placeholder="Search airport, city, state..." aria-label="Search destinations" />
+            <select id="route-scope-filter" class="control-select" aria-label="Filter route scope">
+              <option value="ALL">All Scopes</option>
+              <option value="DOM">Domestic (OTP + T-100)</option>
+              <option value="INTL">International (T-100 v1)</option>
+              <option value="CPA">Shared Regional CPA Spokes</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" id="route-table">
+            <thead>
+              <tr>
+                <th class="sortable" data-sort="dst">Route</th>
+                <th>Destination</th>
+                <th>Scope</th>
+                <th class="num sortable" data-sort="deps">Departures</th>
+                <th class="num sortable" data-sort="lf">T-100 LF</th>
+                <th class="num sortable" data-sort="spd">Seats/Dep</th>
+                <th class="num sortable" data-sort="open">Est. Open</th>
+                <th class="num sortable" data-sort="active_soi">Active SOI</th>
+                <th class="num sortable" data-sort="canc_r">Cancel %</th>
+              </tr>
+            </thead>
+            <tbody id="route-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination-bar">
+          <span id="route-count-info"></span>
+          <div class="panel-controls">
+            <button id="route-prev" type="button" class="btn-ghost">Prev</button>
+            <span id="route-page-label" class="mono"></span>
+            <button id="route-next" type="button" class="btn-ghost">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: TIMING, HEATMAP & SEASONALITY -->
+    <section id="panel-timing" class="tab-panel" role="tabpanel" aria-labelledby="tab-timing">
+      <div class="grid-asymmetric">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Day-of-Week × Departure Hour-Block Standby Matrix</h2>
+              <p class="panel-subtitle">
+                Cells display mean Active SOI (0–100) and modeled open seats. Hover any cell for its 4-component breakdown.
+              </p>
+            </div>
+          </div>
+          <div id="heatmap-container" class="heatmap-wrap"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">SOI 4-Component Sub-Score Breakdown by Hour Block</h2>
+              <p class="panel-subtitle">
+                Weighted contribution: 50% Open Seats + 20% Displacement + 20% Backups + 10% Demand.
+              </p>
+            </div>
+          </div>
+          <div id="subscore-chart"></div>
+          <div class="map-legend">
+            <div class="legend-group">
+              <span class="legend-item"><span class="swatch" style="background: var(--c-open)"></span> Open Seats (50%)</span>
+              <span class="legend-item"><span class="swatch" style="background: var(--c-disp)"></span> Displacement (20%)</span>
+              <span class="legend-item"><span class="swatch" style="background: var(--c-backup)"></span> Backups (20%)</span>
+              <span class="legend-item"><span class="swatch" style="background: var(--c-demand)"></span> Macro Demand (10%)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Holiday Windows vs. Non-Holiday Baseline</h2>
+              <p class="panel-subtitle">
+                Active SOI across deterministic US holiday travel windows vs. non-holiday flights in the selected slice.
+              </p>
+            </div>
+          </div>
+          <div id="holiday-chart"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">56-Month Trend &amp; 2019 Baseline Comparison</h2>
+              <p class="panel-subtitle">
+                Monthly Active SOI (solid blue) vs. T-100 Load Factor (dashed red) across 2019 &amp; 2023–2026.
+              </p>
+            </div>
+            <div class="panel-controls">
+              <select id="trend-scope" class="control-select" aria-label="Trend scope">
+                <option value="DOM">Domestic (SOI + LF)</option>
+                <option value="INTL">International v1 (LF Only)</option>
+              </select>
+            </div>
+          </div>
+          <div id="monthly-trend-chart"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: FLEET, CARRIERS & REGIONAL CPA -->
+    <section id="panel-fleet" class="tab-panel" role="tabpanel" aria-labelledby="tab-fleet">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Mainline vs. United Express Operating Carriers (9 Carriers)</h2>
+            <p class="panel-subtitle">
+              Multi-brand CPA partners (OO SkyWest, YX Republic, 2023 ZW Air Wisconsin) report combined UA/AA/DL traffic in BTS T-100.
+            </p>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Carrier</th>
+                <th>Group</th>
+                <th>T-100 Attribution</th>
+                <th class="num">T-100 Deps</th>
+                <th class="num">T-100 LF</th>
+                <th class="num">Delay 15+ %</th>
+                <th class="num">Cancel %</th>
+                <th class="num">Est. Open</th>
+                <th class="num">Active SOI</th>
+              </tr>
+            </thead>
+            <tbody id="carrier-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid-asymmetric">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Cabin Capacity vs. Standby Opportunity (31 Fleet Subtypes)</h2>
+              <p class="panel-subtitle">
+                Horizontal axis = curated physical seats (<code>seats_config</code>); vertical axis = Active SOI; circle size = flight volume.
+              </p>
+            </div>
+          </div>
+          <div id="fleet-scatter-chart"></div>
+          <div class="map-legend">
+            <div class="legend-group">
+              <span class="legend-item"><span class="swatch circle" style="background: var(--brand)"></span> United Mainline (UA)</span>
+              <span class="legend-item"><span class="swatch circle" style="background: var(--c-express)"></span> United Express Regional</span>
+            </div>
+            <div>100.00% FAA aircraft &amp; seat resolution on performed flights</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Fleet Subtype Breakdown</h2>
+              <p class="panel-subtitle">Includes multi-config sub-fleets (e.g., B777-200 HD 364 vs. Polaris 276).</p>
+            </div>
+          </div>
+          <div class="table-scroll" style="max-height: 390px; overflow-y: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Subtype</th>
+                  <th class="num">Seats</th>
+                  <th class="num">Sample N</th>
+                  <th class="num">Est. Open</th>
+                  <th class="num">Active SOI</th>
+                </tr>
+              </thead>
+              <tbody id="fleet-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: FLIGHT-LEVEL STANDBY SCORER -->
+    <section id="panel-flights" class="tab-panel" role="tabpanel" aria-labelledby="tab-flights">
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Flight-Level Standby Explorer &amp; Formula Inspector</h2>
+            <p class="panel-subtitle">
+              1,409 representative ORD flights sampled across all 56 months, carriers, and hour blocks. Click any flight to inspect its exact 4-component SOI calculation.
+            </p>
+          </div>
+          <div class="panel-controls">
+            <input id="flight-search" type="search" class="search-input" placeholder="Dest, city, flight #, subtype..." aria-label="Search flights" />
+            <select id="flight-hb-filter" class="control-select" aria-label="Filter by hour block">
+              <option value="ALL">All Hour Blocks</option>
+              <option value="0">Early (05:00–07:59)</option>
+              <option value="1">Morning (08:00–10:59)</option>
+              <option value="2">Midday (11:00–13:59)</option>
+              <option value="3">Afternoon (14:00–16:59)</option>
+              <option value="4">Evening (17:00–19:59)</option>
+              <option value="5">Late (20:00–04:59)</option>
+            </select>
+            <select id="flight-tier-filter" class="control-select" aria-label="Filter by SOI tier">
+              <option value="ALL">All Opportunity Tiers</option>
+              <option value="HIGH">High (75–100)</option>
+              <option value="MOD">Moderate (55–74)</option>
+              <option value="TIGHT">Tight (35–54)</option>
+              <option value="LOW">Constrained (0–34)</option>
+              <option value="NULL">Unscored (Cancelled / 2019 Plan)</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Dep</th>
+                <th>Flight</th>
+                <th>Route</th>
+                <th>Carrier</th>
+                <th>Fleet (Seats)</th>
+                <th class="num">Base LF</th>
+                <th class="num">Est. Open</th>
+                <th class="num">Backups</th>
+                <th class="num">Active SOI</th>
+                <th>Tier / Status</th>
+              </tr>
+            </thead>
+            <tbody id="flight-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination-bar">
+          <span id="flight-count-info"></span>
+          <div class="panel-controls">
+            <button id="flight-prev" type="button" class="btn-ghost">Prev</button>
+            <span id="flight-page-label" class="mono"></span>
+            <button id="flight-next" type="button" class="btn-ghost">Next</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: EMPIRICAL VALIDATION & BIGQUERY AUDIT -->
+    <section id="panel-validation" class="tab-panel" role="tabpanel" aria-labelledby="tab-validation">
+      <div class="gate-grid" id="validation-gate-cards"></div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Pillar 1: Expanding Walk-Forward Temporal Consistency (2023–2026)</h2>
+              <p class="panel-subtitle">
+                <code>soi_planning</code> fitted strictly on <code>train.year &lt; eval.year</code> evaluated against post-hoc <code>soi_historical</code> (n = 616,564 paired flights).
+              </p>
+            </div>
+          </div>
+          <div id="val-p1-chart"></div>
+          <div class="caveat-box" id="val-caveat-box"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Pillar 2: Face-Validity Stress Test (Peak Holiday vs. Off-Peak)</h2>
+              <p class="panel-subtitle">
+                Full-dataset mean SOI across seasonal regimes (Historical vs. Planning). Strictly monotonic on <code>soi_historical</code> (+30.60 pts, Welch t = 86.31).
+              </p>
+            </div>
+          </div>
+          <div id="val-p2-chart"></div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Pillar 3: Weight Sensitivity &amp; Ranking Stability</h2>
+              <p class="panel-subtitle">
+                Spearman rank correlation &amp; Top-10% flight overlap against baseline (50/20/20/10) across 814,847 performed flights. Gate: min ρ ≥ 0.85.
+              </p>
+            </div>
+          </div>
+          <div id="val-p3-chart"></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Live BigQuery Warehouse &amp; Section 7 Sanity Checks</h2>
+              <p class="panel-subtitle">
+                Billing-enabled GCP project <code>flight-standby-analytics</code> (US, <code>partition_expiration_ms = NULL</code>).
+              </p>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="bq-audit-table">
+              <thead>
+                <tr>
+                  <th>Control / Layer</th>
+                  <th>Observed Result</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="bq-audit-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div>
+        <strong>Independent Portfolio Project — Not Affiliated with United Airlines, Inc.</strong>
+        Built strictly from public U.S. government aviation datasets (BTS OTP, BTS T-100, FAA Aircraft Registry, TSA Checkpoint Volumes).
+      </div>
+      <div>
+        <a href="https://github.com/sir1602/united-standby-analytics" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+        · Live BigQuery: <span class="mono">flight-standby-analytics</span> (231/231 dbt tests PASS)
+      </div>
+    </div>
+  </footer>
+
+  <!-- Floating Tooltip -->
+  <div id="tooltip" class="floating-tooltip" role="tooltip"></div>
+
+  <!-- Slide-over Drawer (Route Drill-Down / Flight Formula / Disclaimers) -->
+  <div id="drawer-backdrop" class="drawer-backdrop" aria-hidden="true">
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-head">
+        <div>
+          <h2 id="drawer-title">Detail View</h2>
+          <div id="drawer-subtitle" class="panel-subtitle"></div>
+        </div>
+        <button id="drawer-close" type="button" class="drawer-close" aria-label="Close panel">&times;</button>
+      </div>
+      <div id="drawer-body"></div>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

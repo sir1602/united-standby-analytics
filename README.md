@@ -124,16 +124,25 @@ Full warehouse design, billing rules, and benchmark queries are documented in [`
 
 ---
 
-## BI Dashboards: Tableau Public & Google Looker Studio
+## BI Dashboards: Live Web Explorer, Tableau Public & Google Looker Studio
 
-This repository provides **two zero-cost BI delivery paths** from the same validated pipeline:
+This repository provides **three zero-cost BI delivery paths** from the same validated pipeline:
 
-### 1. Tableau Public Dashboard: "United Standby Opportunity Explorer"
-- **Tableau Public Link:** *(Pending user workbook publish — build from [`exports/tableau/`](exports/tableau/) following [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) §6 Publishing Checklist and replace this placeholder URL once published)*
-- **Screenshot Preview:** `<!-- Add exported dashboard PNG screenshot at docs/assets/tableau_dashboard_preview.png once published to Tableau Public -->`
+### 1. Live Interactive Web BI Dashboard (GitHub Pages — Published)
+- **Live Dashboard URL:** **https://sir1602.github.io/united-standby-analytics/**
+- **Source & Data Builder:** [`dashboard/`](dashboard/) built reproducibly via `make build-dashboard` ([`scripts/build_dashboard_data.py`](scripts/build_dashboard_data.py)) from [`exports/looker/`](exports/looker/), [`exports/tableau/dim_date.csv`](exports/tableau/dim_date.csv), and [`docs/phase4_validation_summary.json`](docs/phase4_validation_summary.json), auto-deployed on push to `main` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+- **Interactive Views (5 Tabs):**
+  1. **Network & Route Explorer:** North America + Global ORD Hub-and-Spoke SVG map & searchable 348-destination leaderboard (277 domestic + 71 international `v1`) with click-to-inspect monthly trend drawers.
+  2. **Timing, Heatmap & Seasonality:** Live `Planning (Ex-Ante)` vs. `Historical (Post-Hoc)` Day-of-Week × Hour-Block matrix, 4-component SOI sub-score breakdown, Holiday vs. Baseline chart, and 56-month trend (`2019` baseline vs. `2023–2026`).
+  3. **Fleet, Carriers & Regional CPA:** 9-carrier comparison flagging shared multi-brand CPA spokes (`OO`, `YX`, `2023 ZW`) and 31-subtype cabin capacity vs. SOI scatter plot.
+  4. **Flight-Level Scorer:** Filterable table of representative flights with click-to-inspect exact 4-component SOI equation breakdown.
+  5. **Empirical Validation & BigQuery Audit:** Pillar 1 walk-forward consistency, Pillar 2 face-validity stress test, Pillar 3 weight sensitivity, and live `flight-standby-analytics` warehouse audit (`231/231` dbt tests passing).
+
+### 2. Tableau Public Dashboard: "United Standby Opportunity Explorer"
+- **Specification & Extract Package:** Build from [`exports/tableau/`](exports/tableau/) following [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) §6 Publishing Checklist.
 - **Deliverables (`exports/tableau/`):** `8` star-schema CSV extracts (`34.91 MiB` total, `< 50 MB` Git-safe; `fct_flights_tableau.csv` = `100,000` stratified rows across all 56 months & 9 carriers, `agg_route_month.csv` = `20,877` domestic + international route-months, `route_map_paths.csv` = `696` `ORD`-spoke path points using Tableau's built-in `Airport` geo role) + [`exports/tableau/export_metadata.json`](exports/tableau/export_metadata.json) + `22` copy-paste Tableau calculated fields in [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md).
 
-### 2. Google Looker Studio Dashboard (Zero-Blend Pre-Joined CSVs or Live BigQuery)
+### 3. Google Looker Studio Dashboard (Zero-Blend Pre-Joined CSVs or Live BigQuery)
 - **Specification & Setup Guide:** [`docs/looker_studio_dashboard_spec.md`](docs/looker_studio_dashboard_spec.md)
 - **Deliverables (`exports/looker/`):** `4` pre-joined (denormalized) CSV extracts (`53.91 MiB` total, `< 50 MiB` per file) requiring **zero Data Blends** in Looker Studio's native File Upload connector:
   - [`exports/looker/looker_flights.csv`](exports/looker/looker_flights.csv) (`100,000` rows × `67` cols, `46.68 MiB`): `fct_flights_tableau` pre-joined with carrier, destination city/country, FAA aircraft model, chronological `day_of_week_label` (`1 - Mon`..`7 - Sun`), `hour_block_label` (`1 - Early`..`6 - Late`), and SOI tier labels.
