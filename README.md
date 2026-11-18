@@ -232,9 +232,16 @@ make validate-index-sample
 make export-tableau-sample
 
 # 5. Run full 830,941-flight pipeline, Section 6 validation, and Tableau CSV export
+#    (requires data/raw/ per docs/data_acquisition.md; `make run` is a --dry-run that writes
+#    local Parquet to gitignored data/processed/full/, so no GCP credentials are needed)
 make run
 make validate-index
 make export-tableau
+
+# 6. Optional live BigQuery load: set bigquery.project_id in config/standby.yaml, authenticate
+#    with `gcloud auth application-default login`, then run without --dry-run
+#    (fails fast with BigQueryCredentialsError if no credentials are found)
+.venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
 ```
 
 ### CLI Options for `export-tableau`
