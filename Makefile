@@ -1,4 +1,4 @@
-.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau dbt-parse dbt-compile dbt-docs run bq-load dbt-build all
+.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau export-looker-sample export-looker dbt-parse dbt-compile dbt-docs run bq-load dbt-build all
 
 VENV ?= .venv
 PYTHON := $(VENV)/bin/python
@@ -39,6 +39,12 @@ export-tableau-sample:
 
 export-tableau:
 	$(PYTHON) -m standby export-tableau --hub ORD --years 2019,2023-2026
+
+export-looker-sample:
+	$(PYTHON) -m standby export-looker --hub ORD --years 2019,2023-2026 --sample
+
+export-looker:
+	$(PYTHON) -m standby export-looker --hub ORD --years 2019,2023-2026
 
 dbt-parse:
 	$(DBT) parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache

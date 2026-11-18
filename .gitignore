@@ -43,8 +43,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Optional full-size (>50 MB) local Tableau flight extracts
+# Optional full-size (>50 MB) local Tableau / Looker Studio flight extracts
 exports/tableau/*_full.csv
 exports/tableau/full/
+exports/looker/*_full.csv
+exports/looker/full/
 # Staging dirs left behind only if an export is killed mid-write
 .export-tmp-*/

@@ -40,8 +40,11 @@ jobs:
       - name: Run pytest suite on data/sample/
         run: .venv/bin/pytest -v
 
-      - name: Run CLI end-to-end sample dry-run
-        run: .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026 --sample --dry-run
+      - name: Run CLI end-to-end sample dry-run & BI exports
+        run: |
+          .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026 --sample --dry-run
+          .venv/bin/python -m standby export-tableau --hub ORD --years 2019,2023-2026 --sample
+          .venv/bin/python -m standby export-looker --hub ORD --years 2019,2023-2026 --sample
 
       - name: Validate dbt project (offline parse)
         run: .venv/bin/dbt parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
