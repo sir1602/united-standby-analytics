@@ -26,9 +26,9 @@ select
     extract(month from s.date_day) as month,
     extract(day from s.date_day) as day_of_month,
     -- ISO day of week (1=Monday .. 7=Sunday), matching BTS OTP DayOfWeek
-    mod(extract(dayofweek from s.date_day) + 5, 7) + 1 as day_of_week,
+    mod({{ bq_dayofweek('s.date_day') }} + 5, 7) + 1 as day_of_week,
     format_date('%A', s.date_day) as day_name,
-    (mod(extract(dayofweek from s.date_day) + 5, 7) + 1) in (6, 7) as is_weekend,
+    (mod({{ bq_dayofweek('s.date_day') }} + 5, 7) + 1) in (6, 7) as is_weekend,
     {{ is_holiday_window('s.date_day') }} as is_holiday_window,
     {{ holiday_name_for_date('s.date_day') }} as holiday_name,
     tsa.tsa_throughput,

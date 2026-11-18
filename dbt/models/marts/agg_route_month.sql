@@ -103,7 +103,7 @@ select
     t.passengers,
     t.distance_miles,
     t.aircraft_type_count,
-    least(1.0, greatest(0.0, safe_divide(t.passengers, nullif(t.seats, 0.0)))) as t100_load_factor,
+    {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(t.passengers, nullif(t.seats, 0.0)))) as t100_load_factor,
     safe_divide(t.seats, nullif(t.departures_performed, 0.0)) as t100_seats_per_departure,
     coalesce(o.is_shared_regional_spoke, false) as is_shared_regional_spoke,
     o.otp_scheduled_flights,

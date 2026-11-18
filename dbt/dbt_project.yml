@@ -11,6 +11,10 @@ seed-paths: ["seeds"]
 macro-paths: ["macros"]
 snapshot-paths: ["snapshots"]
 
+# BigQuery-compatibility shims for the DuckDB target (renders empty, and is skipped, on BigQuery).
+on-run-start:
+  - "{{ register_bigquery_compat_shims() }}"
+
 clean-targets:
   - "target"
   - "dbt_packages"

@@ -233,7 +233,7 @@ lf_t1 as (
         dest,
         month,
         bts_aircraft_type,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
     from dom_t100_train
     where bts_aircraft_type is not null
       and trim(bts_aircraft_type) != ''
@@ -248,7 +248,7 @@ lf_t2 as (
         origin,
         dest,
         month,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
     from dom_t100_train
     group by eval_year, op_carrier, origin, dest, month
     having sum(seats) > 0 and sum(departures_performed) > 0
@@ -260,7 +260,7 @@ lf_t3 as (
         origin,
         dest,
         month,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
     from dom_t100_train
     where is_ua_family = true
     group by eval_year, origin, dest, month
@@ -273,7 +273,7 @@ lf_t4 as (
         op_carrier,
         origin,
         dest,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
     from dom_t100_train
     group by eval_year, op_carrier, origin, dest
     having sum(seats) > 0 and sum(departures_performed) > 0
@@ -284,7 +284,7 @@ lf_t5 as (
         eval_year,
         origin,
         dest,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf
     from dom_t100_train
     where is_ua_family = true
     group by eval_year, origin, dest
@@ -556,19 +556,19 @@ planning_open_seats as (
              and r_tsa_month_plan is not null
             then (
                 seats_config_plan - cast(
-                    least(
+                    {{ bq_least() }}(
                         seats_config_plan,
-                        greatest(
+                        {{ bq_greatest() }}(
                             0,
                             round(
-                                cast(seats_config_plan as float64) * least(
+                                cast(seats_config_plan as float64) * {{ bq_least() }}(
                                     1.0,
-                                    greatest(
+                                    {{ bq_greatest() }}(
                                         0.0,
                                         lf_plan
-                                        * least(
+                                        * {{ bq_least() }}(
                                             {{ var('tsa_multiplier_max', 1.20) }},
-                                            greatest(
+                                            {{ bq_greatest() }}(
                                                 {{ var('tsa_multiplier_min', 0.80) }},
                                                 1.0 + {{ var('tsa_damping_alpha', 0.35) }} * (r_tsa_month_plan - 1.0)
                                             )
@@ -593,10 +593,10 @@ subscores as (
         case
             when eligible_hist then (
                 {{ var('open_abs_weight', 0.50) }} * (
-                    100.0 * least(1.0, greatest(0.0, safe_divide(cast(est_open_seats_adjusted as float64), {{ var('open_abs_cap', 25.0) }})))
+                    100.0 * {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(cast(est_open_seats_adjusted as float64), {{ var('open_abs_cap', 25.0) }})))
                 )
                 + (1.0 - {{ var('open_abs_weight', 0.50) }}) * (
-                    100.0 * least(1.0, greatest(0.0, safe_divide(safe_divide(cast(est_open_seats_adjusted as float64), cast(seats_config as float64)), {{ var('open_pct_cap', 0.30) }})))
+                    100.0 * {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(safe_divide(cast(est_open_seats_adjusted as float64), cast(seats_config as float64)), {{ var('open_pct_cap', 0.30) }})))
                 )
             )
             else cast(null as float64)
@@ -604,16 +604,16 @@ subscores as (
 
         case
             when eligible_hist then (
-                100.0 * greatest(0.0, least(1.0, 1.0 - safe_divide(weighted_displacement_hist, {{ var('disp_hist_cap', 2.0) }})))
+                100.0 * {{ bq_greatest() }}(0.0, {{ bq_least() }}(1.0, 1.0 - safe_divide(weighted_displacement_hist, {{ var('disp_hist_cap', 2.0) }})))
             )
             else cast(null as float64)
         end as s_disp_hist,
 
         case
             when eligible_hist then (
-                100.0 * least(
+                100.0 * {{ bq_least() }}(
                     1.0,
-                    greatest(
+                    {{ bq_greatest() }}(
                         0.0,
                         safe_divide(
                             ln(1.0 + cast(remaining_performed_backups as float64)),
@@ -627,9 +627,9 @@ subscores as (
 
         case
             when eligible_hist then (
-                100.0 * least(
+                100.0 * {{ bq_least() }}(
                     1.0,
-                    greatest(
+                    {{ bq_greatest() }}(
                         0.0,
                         safe_divide(
                             {{ var('demand_r_max', 1.35) }} - (tsa_ratio_year + if(is_holiday_window, {{ var('demand_holiday_boost', 0.10) }}, 0.0)),
@@ -645,10 +645,10 @@ subscores as (
         case
             when eligible_plan then (
                 {{ var('open_abs_weight', 0.50) }} * (
-                    100.0 * least(1.0, greatest(0.0, safe_divide(cast(est_open_plan_adj as float64), {{ var('open_abs_cap', 25.0) }})))
+                    100.0 * {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(cast(est_open_plan_adj as float64), {{ var('open_abs_cap', 25.0) }})))
                 )
                 + (1.0 - {{ var('open_abs_weight', 0.50) }}) * (
-                    100.0 * least(1.0, greatest(0.0, safe_divide(safe_divide(cast(est_open_plan_adj as float64), cast(seats_config_plan as float64)), {{ var('open_pct_cap', 0.30) }})))
+                    100.0 * {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(safe_divide(cast(est_open_plan_adj as float64), cast(seats_config_plan as float64)), {{ var('open_pct_cap', 0.30) }})))
                 )
             )
             else cast(null as float64)
@@ -656,9 +656,9 @@ subscores as (
 
         case
             when eligible_plan then (
-                100.0 * greatest(
+                100.0 * {{ bq_greatest() }}(
                     0.0,
-                    least(
+                    {{ bq_least() }}(
                         1.0,
                         1.0 - safe_divide(
                             cast(prior_strict_scheduled_count as float64) * q_hat_plan * {{ var('disp_plan_beta', 0.65) }} + q_hat_plan,
@@ -672,9 +672,9 @@ subscores as (
 
         case
             when eligible_plan then (
-                100.0 * least(
+                100.0 * {{ bq_least() }}(
                     1.0,
-                    greatest(
+                    {{ bq_greatest() }}(
                         0.0,
                         safe_divide(
                             ln(1.0 + cast(remaining_scheduled_backups as float64)),
@@ -688,9 +688,9 @@ subscores as (
 
         case
             when eligible_plan then (
-                100.0 * least(
+                100.0 * {{ bq_least() }}(
                     1.0,
-                    greatest(
+                    {{ bq_greatest() }}(
                         0.0,
                         safe_divide(
                             {{ var('demand_r_max', 1.35) }} - (r_tsa_year_plan + if(is_holiday_window, {{ var('demand_holiday_boost', 0.10) }}, 0.0)),

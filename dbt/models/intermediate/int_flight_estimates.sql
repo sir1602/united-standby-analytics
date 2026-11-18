@@ -24,7 +24,7 @@ with_lf_adjusted as (
             when has_valid_t100
              and tsa_demand_multiplier is not null
              and hour_block_multiplier is not null
-                then least(1.0, greatest(0.0, est_load_factor * tsa_demand_multiplier * hour_block_multiplier))
+                then {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, est_load_factor * tsa_demand_multiplier * hour_block_multiplier))
             else cast(null as float64)
         end as est_lf_adjusted
     from base
@@ -35,12 +35,12 @@ with_passengers as (
         *,
         case
             when has_valid_t100 and seats_config is not null
-                then cast(least(seats_config, greatest(0, round(seats_config * est_load_factor))) as int64)
+                then cast({{ bq_least() }}(seats_config, {{ bq_greatest() }}(0, round(seats_config * est_load_factor))) as int64)
             else cast(null as int64)
         end as est_passengers,
         case
             when est_lf_adjusted is not null and seats_config is not null
-                then cast(least(seats_config, greatest(0, round(seats_config * est_lf_adjusted))) as int64)
+                then cast({{ bq_least() }}(seats_config, {{ bq_greatest() }}(0, round(seats_config * est_lf_adjusted))) as int64)
             else cast(null as int64)
         end as est_passengers_adjusted
     from with_lf_adjusted

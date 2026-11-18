@@ -1,4 +1,4 @@
-.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau dbt-parse dbt-compile dbt-docs run all
+.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau dbt-parse dbt-compile dbt-docs dbt-build-duckdb-sample dbt-build-duckdb run all
 
 VENV ?= .venv
 PYTHON := $(VENV)/bin/python
@@ -48,6 +48,14 @@ dbt-compile:
 
 dbt-docs:
 	$(DBT) docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+
+# Free local dbt build on DuckDB (no GCP account). Reads the dry-run Parquet that the pipeline writes.
+dbt-build-duckdb-sample: ingest-sample
+	STANDBY_DUCKDB_PATH=data/processed/sample.duckdb $(DBT) build --project-dir dbt --profiles-dir dbt --target duckdb --vars '{raw_parquet_dir: data/processed/sample}' --no-send-anonymous-usage-stats
+
+# Full data: run `make run` first (writes data/processed/full/*.parquet).
+dbt-build-duckdb:
+	$(DBT) build --project-dir dbt --profiles-dir dbt --target duckdb --no-send-anonymous-usage-stats
 
 run:
 	$(PYTHON) -m standby run --hub ORD --years 2019,2023-2026 --dry-run

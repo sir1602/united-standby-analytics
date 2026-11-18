@@ -238,11 +238,25 @@ make run
 make validate-index
 make export-tableau
 
-# 6. Optional live BigQuery load: set bigquery.project_id in config/standby.yaml, authenticate
+# 6. Free local dbt build on DuckDB (no GCP account): builds all staging/intermediate/mart
+#    models and runs every dbt data test against the dry-run Parquet from step 4 or 5
+make dbt-build-duckdb-sample   # CI sample -> data/processed/sample.duckdb
+make dbt-build-duckdb          # full data (after `make run`) -> data/processed/standby.duckdb
+
+# 7. Optional live BigQuery load: set bigquery.project_id in config/standby.yaml, authenticate
 #    with `gcloud auth application-default login`, then run without --dry-run
 #    (fails fast with BigQueryCredentialsError if no credentials are found)
 .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
 ```
+
+### Local dbt on DuckDB (Free Alternative to BigQuery)
+The same dbt models run on [DuckDB](https://duckdb.org) via the `duckdb` target in [`dbt/profiles.yml`](dbt/profiles.yml) (D-39). Raw sources are read straight from the dry-run Parquet (`data/processed/{sample,full}/*.parquet`), and the marts land in a local `.duckdb` file you can query with Python or the DuckDB CLI:
+
+```bash
+.venv/bin/python -c "import duckdb; print(duckdb.connect('data/processed/standby.duckdb', read_only=True).sql('select year, count(*), avg(soi_historical) from marts.fct_flights group by 1 order by 1'))"
+```
+
+Models stay in BigQuery SQL. [`dbt/macros/cross_db.sql`](dbt/macros/cross_db.sql) registers BigQuery-compatible DuckDB shims (`safe_divide`, `logical_or`, `format_date`, `float64`, ...) and dispatches the constructs whose semantics differ (NULL-propagating `greatest`/`least`, `extract(dayofweek)` numbering, date arithmetic), so BigQuery compiled SQL is unchanged. [`tests/test_dbt_duckdb.py`](tests/test_dbt_duckdb.py) runs `dbt build --target duckdb` on the CI sample and checks `fct_flights` against the Python pipeline column by column.
 
 ### CLI Options for `export-tableau`
 ```bash

@@ -6,7 +6,7 @@ with parsed as (
     select
         coalesce(
             safe.parse_date('%Y-%m-%d', trim(cast(date_day as string))),
-            safe_cast(date_day as date)
+            {{ safe_cast_as('date_day', 'date') }}
         ) as date_day,
         cast(tsa_throughput as int64) as tsa_throughput,
         trim(cast(source_page_year as string)) as source_page_year,
@@ -16,7 +16,7 @@ with parsed as (
     qualify row_number() over (
         partition by coalesce(
             safe.parse_date('%Y-%m-%d', trim(cast(date_day as string))),
-            safe_cast(date_day as date)
+            {{ safe_cast_as('date_day', 'date') }}
         )
         order by cast(tsa_throughput as int64) desc
     ) = 1
@@ -60,13 +60,13 @@ select
     date_day,
     year,
     month,
-    mod(extract(dayofweek from date_day) + 5, 7) + 1 as iso_dow,
+    mod({{ bq_dayofweek('date_day') }} + 5, 7) + 1 as iso_dow,
     {{ is_holiday_window('date_day') }} as is_holiday_window,
     tsa_throughput,
     tsa_ratio_month,
-    least(
+    {{ bq_least() }}(
         {{ var('tsa_multiplier_max', 1.20) }},
-        greatest(
+        {{ bq_greatest() }}(
             {{ var('tsa_multiplier_min', 0.80) }},
             1.0 + {{ var('tsa_damping_alpha', 0.35) }} * (tsa_ratio_month - 1.0)
         )
