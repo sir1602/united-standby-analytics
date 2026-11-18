@@ -29,6 +29,10 @@ class TableLoadResult:
     local_artifact_path: Path | None = None
 
 
+class BigQueryCredentialsError(RuntimeError):
+    """Raised when a live (non-dry-run) BigQuery load is attempted without GCP credentials."""
+
+
 def prepare_dataframe_for_bigquery(df: pd.DataFrame, table_name: str) -> pd.DataFrame:
     """Normalize standardized columns for BigQuery batch loads (e.g., `flight_date` -> `datetime.date`)."""
     prepared = df.copy()
@@ -162,22 +166,14 @@ def load_dataframe_to_bigquery(
             partition_field=partition_field,
             clustering_fields=clustering_fields,
         )
-    except DefaultCredentialsError:
-        out_dir = config.processed_dir / ("sample" if config.sample_mode else "full")
-        out_dir.mkdir(parents=True, exist_ok=True)
-        artifact_path = out_dir / f"{bq_table_name}.parquet"
-        df_to_load.to_parquet(artifact_path, index=False)
-        logger.warning(
-            f"No GCP credentials detected; wrote local batch artifact for {full_table_id} ({len(df_to_load):,} rows) to {artifact_path}"
-        )
-        return TableLoadResult(
-            table_id=full_table_id,
-            row_count=len(df_to_load),
-            mode="local_fallback_no_credentials",
-            partition_field=partition_field,
-            clustering_fields=clustering_fields,
-            local_artifact_path=artifact_path,
-        )
+    except DefaultCredentialsError as exc:
+        # Fail fast: a live (non-dry-run) load without credentials must not write a local
+        # artifact and report success -- the CLI would print `... SUCCEEDED` with nothing in BigQuery.
+        raise BigQueryCredentialsError(
+            f"No GCP credentials found for live BigQuery load of {full_table_id}. "
+            "Configure Application Default Credentials (`gcloud auth application-default login`) "
+            "or rerun with `--dry-run` to write local Parquet artifacts instead."
+        ) from exc
 
 
 def load_all_raw_tables(

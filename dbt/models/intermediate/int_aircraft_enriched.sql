@@ -9,6 +9,8 @@ faa_valid as (
     select
         reg.n_number,
         reg.registry_source,
+        reg.serial_number,
+        reg.cancel_date,
         ref_acft.faa_manufacturer,
         ref_acft.faa_model,
         ref_acft.faa_tc_max_seats
@@ -25,7 +27,11 @@ faa_master as (
         faa_tc_max_seats
     from faa_valid
     where registry_source = 'faa_master'
-    qualify row_number() over (partition by n_number order by n_number) = 1
+    -- Dedup AFTER the seat-floor join: latest cancel_date, then lowest serial_number
+    qualify row_number() over (
+        partition by n_number
+        order by coalesce(cancel_date, '') desc, coalesce(serial_number, '') asc
+    ) = 1
 ),
 
 faa_dereg as (
@@ -36,7 +42,11 @@ faa_dereg as (
         faa_tc_max_seats
     from faa_valid
     where registry_source = 'faa_dereg'
-    qualify row_number() over (partition by n_number order by n_number) = 1
+    -- Dedup AFTER the seat-floor join: latest cancel_date, then lowest serial_number
+    qualify row_number() over (
+        partition by n_number
+        order by coalesce(cancel_date, '') desc, coalesce(serial_number, '') asc
+    ) = 1
 ),
 
 seat_cfg as (

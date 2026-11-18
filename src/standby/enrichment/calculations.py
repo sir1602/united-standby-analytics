@@ -29,7 +29,17 @@ def compute_tsa_daily_multipliers(
     df = tsa_df[["date_day", "tsa_throughput"]].copy()
     df["date_day"] = df["date_day"].astype(str).str.strip()
     df["tsa_throughput"] = pd.to_numeric(df["tsa_throughput"], errors="coerce")
-    df = df.drop_duplicates(subset=["date_day"], keep="first").copy()
+    # Keep the highest throughput per duplicate date (parity with dbt `stg_tsa_throughput`).
+    df = (
+        df.sort_values(
+            ["date_day", "tsa_throughput"],
+            ascending=[True, False],
+            na_position="last",
+            kind="mergesort",
+        )
+        .drop_duplicates(subset=["date_day"], keep="first")
+        .copy()
+    )
     df["_ym"] = df["date_day"].str.slice(0, 7)
 
     monthly_mean = df.groupby("_ym")["tsa_throughput"].transform("mean")

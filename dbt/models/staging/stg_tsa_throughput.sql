@@ -39,6 +39,7 @@ with_means as (
         confidence_tier
     from parsed
     where date_day is not null
+      and extract(year from date_day) in ({{ var("years") | join(", ") }})
 ),
 
 with_ratios as (

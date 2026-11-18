@@ -119,12 +119,7 @@ models:
               max_value: 1.0
 
   - name: stg_faa_aircraft
-    description: "Deduplicated FAA MASTER and DEREG aircraft registration rows (1 row per n_number + registry_source)."
-    data_tests:
-      - unique_combination_of_columns:
-          combination_of_columns:
-            - n_number
-            - registry_source
+    description: "FAA MASTER and DEREG aircraft registration records (1 row per record; per-n_number dedup happens after the seat-floor join in int_aircraft_enriched)."
     columns:
       - name: n_number
         description: "FAA N-number without leading N."

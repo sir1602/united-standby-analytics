@@ -47,8 +47,10 @@ def ingest_tsa(data_dir: Path, years: list[int] | None = None) -> pd.DataFrame:
         allowed_prefixes = tuple(f"{y}-" for y in years)
         out = out[out["date_day"].str.startswith(allowed_prefixes)].copy()
 
+    # Duplicate dates (overlapping TSA year pages): keep the highest throughput, matching
+    # dbt `stg_tsa_throughput` (`qualify row_number() ... order by tsa_throughput desc`).
     out = (
-        out.sort_values("date_day")
+        out.sort_values(["date_day", "tsa_throughput"], ascending=[True, False], kind="mergesort")
         .drop_duplicates(subset=["date_day"], keep="first")
         .reset_index(drop=True)
     )
