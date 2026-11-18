@@ -1,0 +1,69 @@
+{
+  "generated_at_utc": "2026-11-18T15:46:53Z",
+  "hub": "ORD",
+  "years": [
+    2019,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "sample_mode": false,
+  "flight_mode": "stratified",
+  "flight_row_budget": 100000,
+  "stratify_seed": 42,
+  "float_precision": 4,
+  "total_source_flights": 830941,
+  "exported_flights": 100000,
+  "invariants_passed": true,
+  "files": {
+    "agg_route_month.csv": {
+      "rows": 20877,
+      "columns": 30,
+      "bytes": 4036151,
+      "sha256": "f188abcc61e63542d567490f0c551766c29da16b343a4f1f9ad91f173c002fdb"
+    },
+    "dim_airport.csv": {
+      "rows": 349,
+      "columns": 10,
+      "bytes": 33715,
+      "sha256": "b05d3bf4b113fccaa89697ac96c8f20e687e07aad0ead0a2387940904fe488ee"
+    },
+    "dim_aircraft.csv": {
+      "rows": 1908,
+      "columns": 22,
+      "bytes": 424856,
+      "sha256": "329b24ad8e8adccdd8d9add3ae0b6f380d037e1fe126b1baeb5762888e0593e1"
+    },
+    "dim_carrier.csv": {
+      "rows": 9,
+      "columns": 8,
+      "bytes": 1301,
+      "sha256": "cf2c427584fbc4233d1e0d472e186d2a836143e25812d7d251d57a8a94ce3c2c"
+    },
+    "dim_date.csv": {
+      "rows": 1777,
+      "columns": 14,
+      "bytes": 136505,
+      "sha256": "e56ecbd4a3ecc1fc4ffc0c15003bdf64d78a608dcf64eb626b79819b365bdae4"
+    },
+    "fct_flights_tableau.csv": {
+      "rows": 100000,
+      "columns": 51,
+      "bytes": 31882187,
+      "sha256": "7985388c2da483b55ff7d74c0df35fa1959084d4fb77e0e6b334aaeed30b3dfc"
+    },
+    "route_map_paths.csv": {
+      "rows": 696,
+      "columns": 14,
+      "bytes": 89693,
+      "sha256": "69b77efef50698f5a1e0fe3817cc6ab099a00e3b0b25ff072bb720eb09a04359"
+    },
+    "validation_summary.csv": {
+      "rows": 45,
+      "columns": 7,
+      "bytes": 6132,
+      "sha256": "1ab4cc411d3ca0628a95c953ea09845d5c9a4b0b85d9c612896caebf37507db6"
+    }
+  }
+}

@@ -522,3 +522,77 @@ def validate_index_cmd(
         f"holdout_rho={holdout_rho}, walk_forward_rho={wf_rho}, "
         f"summary={resolved_summary}"
     )
+
+
+@main.command("export-tableau")
+@click.option(
+    "--hub",
+    default=None,
+    help="Origin hub IATA code (defaults to `config/standby.yaml` default_hub).",
+)
+@click.option(
+    "--years",
+    default=None,
+    callback=_validate_years_option,
+    help="Years to export (comma/range syntax, e.g. 2019,2023-2026; defaults to YAML config).",
+)
+@click.option("--sample", is_flag=True, default=False, help="Export data/sample/ for fast CI.")
+@click.option(
+    "--output-dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Output directory for Tableau CSV extracts (defaults to `exports/tableau`).",
+)
+@click.option(
+    "--flight-mode",
+    type=click.Choice(["stratified", "recent-12m", "full"], case_sensitive=False),
+    default=None,
+    help="Flight extract row selection mode (defaults to config `export.tableau_flight_mode`).",
+)
+@click.option(
+    "--max-flight-rows",
+    type=int,
+    default=None,
+    help="Maximum rows for stratified/recent-12m `fct_flights_tableau.csv` (defaults to 100,000).",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=None,
+    help="Deterministic random seed for stratified sampling (defaults to 42).",
+)
+@click.option(
+    "--from-processed/--recompute",
+    default=True,
+    show_default=True,
+    help="Read existing processed Parquets when present, or recompute from raw sources.",
+)
+def export_tableau_cmd(
+    hub: str | None,
+    years: str | None,
+    sample: bool,
+    output_dir: Path | None,
+    flight_mode: str | None,
+    max_flight_rows: int | None,
+    seed: int | None,
+    from_processed: bool,
+) -> None:
+    """Export mart-aligned CSV extracts for Tableau Public and validate post-export invariants."""
+    from standby.export.tableau import export_tableau_extracts
+
+    cfg = _load_cli_config(hub=hub, years=years, sample_mode=sample, dry_run=True)
+    result = export_tableau_extracts(
+        config=cfg,
+        output_dir=output_dir,
+        flight_mode=flight_mode,
+        max_flight_rows=max_flight_rows,
+        stratify_seed=seed,
+        from_processed=from_processed,
+    )
+    total_bytes = sum(info.bytes for info in result.files.values())
+    click.echo(
+        f"TABLEAU EXPORT SUCCEEDED: files={len(result.files)}, "
+        f"flight_mode={result.flight_mode}, exported_flights={result.exported_flights:,}/"
+        f"{result.total_source_flights:,}, total_mb={total_bytes / (1024 * 1024):.2f}, "
+        f"output_dir={result.output_dir}"
+    )

@@ -42,3 +42,6 @@ gcloud-key*.json
 Thumbs.db
 .vscode/
 .idea/
+
+# Optional full-size (>50 MB) local Tableau flight extracts
+exports/tableau/*_full.csv

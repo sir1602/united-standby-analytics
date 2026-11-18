@@ -99,6 +99,17 @@ class ScoringConfig:
     demand_ratio_max: float = 1.35
 
 
+@dataclass(frozen=True)
+class ExportConfig:
+    """Configuration parameters for Phase 5 Tableau CSV exports."""
+
+    tableau_flight_mode: str = "stratified"
+    tableau_flight_max_rows: int = 100_000
+    tableau_stratify_seed: int = 42
+    tableau_float_precision: int = 4
+    tableau_max_file_mb: float = 50.0
+
+
 @dataclass
 class StandbyConfig:
     """Typed pipeline configuration resolved from `config/standby.yaml`."""
@@ -125,6 +136,7 @@ class StandbyConfig:
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     sanity_checks: SanityCheckConfig = field(default_factory=SanityCheckConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
     sample_mode: bool = False
     dry_run: bool = False
     raw_yaml: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -379,6 +391,26 @@ def load_config(
         demand_ratio_max=float(scr_raw.get("demand_ratio_max", default_scr.demand_ratio_max)),
     )
 
+    exp_raw = raw.get("export", {})
+    default_exp = ExportConfig()
+    export_config = ExportConfig(
+        tableau_flight_mode=str(
+            exp_raw.get("tableau_flight_mode", default_exp.tableau_flight_mode)
+        ).strip(),
+        tableau_flight_max_rows=int(
+            exp_raw.get("tableau_flight_max_rows", default_exp.tableau_flight_max_rows)
+        ),
+        tableau_stratify_seed=int(
+            exp_raw.get("tableau_stratify_seed", default_exp.tableau_stratify_seed)
+        ),
+        tableau_float_precision=int(
+            exp_raw.get("tableau_float_precision", default_exp.tableau_float_precision)
+        ),
+        tableau_max_file_mb=float(
+            exp_raw.get("tableau_max_file_mb", default_exp.tableau_max_file_mb)
+        ),
+    )
+
     return StandbyConfig(
         project_name=str(proj.get("name", "united-standby-analytics")),
         project_version=str(proj.get("version", "0.1.0")),
@@ -403,6 +435,7 @@ def load_config(
         enrichment=enrichment_config,
         sanity_checks=sanity_config,
         scoring=scoring_config,
+        export=export_config,
         sample_mode=sample_mode,
         dry_run=dry_run,
         raw_yaml=raw,

@@ -1,0 +1,350 @@
+airport_code,airport_id,airport_name,city_name,state_or_country,country_code,is_hub,has_domestic_service,has_international_service,confidence_tier
+ABE,10135,"Allentown/Bethlehem/Easton, PA: Lehigh Valley International",Allentown/Bethlehem/Easton,PA,US,False,True,False,actual
+ABI,10136,"Abilene, TX: Abilene Regional",Abilene,TX,US,False,True,False,actual
+ABQ,10140,"Albuquerque, NM: Albuquerque International Sunport",Albuquerque,NM,US,False,True,False,actual
+ACK,10154,"Nantucket, MA: Nantucket Memorial",Nantucket,MA,US,False,True,False,actual
+ACY,10158,"Atlantic City, NJ: Atlantic City International",Atlantic City,NJ,US,False,True,False,actual
+AEX,10185,"Alexandria, LA: Alexandria International",Alexandria,LA,US,False,True,False,actual
+ALB,10257,"Albany, NY: Albany International",Albany,NY,US,False,True,False,actual
+ALO,10268,"Waterloo, IA: Waterloo Regional",Waterloo,IA,US,False,True,False,actual
+AMA,10279,"Amarillo, TX: Rick Husband Amarillo International",Amarillo,TX,US,False,True,False,actual
+AMS,10292,"Amsterdam, Netherlands: Schiphol",Amsterdam,Netherlands,NL,False,False,True,actual
+ANC,10299,"Anchorage, AK: Ted Stevens Anchorage International",Anchorage,AK,US,False,True,False,actual
+ASE,10372,"Aspen, CO: Aspen Pitkin County Sardy Field",Aspen,CO,US,False,True,False,actual
+ATH,10394,"Athens, Greece: Eleftherios Venizelos International",Athens,Greece,GR,False,False,True,actual
+ATL,10397,"Atlanta, GA: Hartsfield-Jackson Atlanta International",Atlanta,GA,US,False,True,False,actual
+ATW,10408,"Appleton, WI: Appleton International",Appleton,WI,US,False,True,False,actual
+ATY,10409,"Watertown, SD: Watertown Regional",Watertown,SD,US,False,True,False,actual
+AUA,10411,"Aruba, Aruba: Reina Beatrix International",Aruba,Aruba,AW,False,False,True,actual
+AUS,10423,"Austin, TX: Austin - Bergstrom International",Austin,TX,US,False,True,False,actual
+AVL,10431,"Asheville, NC: Asheville Regional",Asheville,NC,US,False,True,False,actual
+AVP,10434,"Scranton/Wilkes-Barre, PA: Wilkes Barre Scranton International",Scranton/Wilkes-Barre,PA,US,False,True,False,actual
+AZO,10469,"Kalamazoo, MI: Kalamazoo/Battle Creek International",Kalamazoo,MI,US,False,True,False,actual
+BCN,10517,"Barcelona, Spain: Barcelona Airport",Barcelona,Spain,ES,False,False,True,actual
+BDL,10529,"Hartford, CT: Bradley International",Hartford,CT,US,False,True,False,actual
+BED,10540,"Bedford, MA: Laurence G Hanscom Field",Bedford,MA,US,False,True,False,actual
+BFD,10557,"Bradford, PA: Bradford Regional",Bradford,PA,US,False,True,False,actual
+BFF,10558,"Scottsbluff, NE: Scottsbluff W Neb Regional Wm B Heilig Field",Scottsbluff,NE,US,False,True,False,actual
+BFM,10562,"Mobile, AL: Mobile International",Mobile,AL,US,False,True,False,actual
+BGR,10581,"Bangor, ME: Bangor International",Bangor,ME,US,False,True,False,actual
+BHM,10599,"Birmingham, AL: Birmingham-Shuttlesworth International",Birmingham,AL,US,False,True,False,actual
+BIL,10620,"Billings, MT: Billings Logan International",Billings,MT,US,False,True,False,actual
+BIS,10627,"Bismarck/Mandan, ND: Bismarck Municipal",Bismarck/Mandan,ND,US,False,True,False,actual
+BJX,10638,"Leon/Guanajuato, Mexico: Leon International",Leon/Guanajuato,Mexico,MX,False,False,True,actual
+BMG,10683,"Bloomington, IN: Monroe County",Bloomington,IN,US,False,True,False,actual
+BMI,10685,"Bloomington/Normal, IL: Central Il Regional Airport at Bloomington",Bloomington/Normal,IL,US,False,True,False,actual
+BNA,10693,"Nashville, TN: Nashville International",Nashville,TN,US,False,True,False,actual
+BOI,10713,"Boise, ID: Boise Air Terminal",Boise,ID,US,False,True,False,actual
+BOS,10721,"Boston, MA: Logan International",Boston,MA,US,False,True,False,actual
+BQN,10732,"Aguadilla, PR: Rafael Hernandez",Aguadilla,PR,US,False,True,False,actual
+BRO,10747,"Brownsville, TX: Brownsville South Padre Island International",Brownsville,TX,US,False,True,False,actual
+BRU,10752,"Brussels, Belgium: Brussels National",Brussels,Belgium,BE,False,False,True,actual
+BTL,10778,"Battle Creek, MI: Battle Creek Executive at Kellogg Field",Battle Creek,MI,US,False,True,False,actual
+BTR,10781,"Baton Rouge, LA: Baton Rouge Metropolitan/Ryan Field",Baton Rouge,LA,US,False,True,False,actual
+BTV,10785,"Burlington, VT: Patrick Leahy Burlington International",Burlington,VT,US,False,True,False,actual
+BUF,10792,"Buffalo, NY: Buffalo Niagara International",Buffalo,NY,US,False,True,False,actual
+BWI,10821,"Baltimore, MD: Baltimore/Washington International Thurgood Marshall",Baltimore,MD,US,False,True,False,actual
+BZE,10846,"Belize City, Belize: Philip S. W. Goldson International",Belize City,Belize,BZ,False,False,True,actual
+BZN,10849,"Bozeman, MT: Bozeman Yellowstone International",Bozeman,MT,US,False,True,False,actual
+CAE,10868,"Columbia, SC: Columbia Metropolitan",Columbia,SC,US,False,True,False,actual
+CAK,10874,"Akron, OH: Akron-Canton Regional",Akron,OH,US,False,True,False,actual
+CDG,10920,"Paris, France: Charles de Gaulle",Paris,France,FR,False,False,True,actual
+CGI,10967,"Cape Girardeau, MO: Cape Girardeau Regional",Cape Girardeau,MO,US,False,True,False,actual
+CHA,10980,"Chattanooga, TN: Lovell Field",Chattanooga,TN,US,False,True,False,actual
+CHO,10990,"Charlottesville, VA: Charlottesville Albemarle",Charlottesville,VA,US,False,True,False,actual
+CHS,10994,"Charleston, SC: Charleston AFB/International",Charleston,SC,US,False,True,False,actual
+CID,11003,"Cedar Rapids/Iowa City, IA: The Eastern Iowa",Cedar Rapids/Iowa City,IA,US,False,True,False,actual
+CIU,11013,"Sault Ste. Marie, MI: Chippewa County International",Sault Ste. Marie,MI,US,False,True,False,actual
+CKB,11027,"Clarksburg/Fairmont, WV: North Central West Virginia",Clarksburg/Fairmont,WV,US,False,True,False,actual
+CLE,11042,"Cleveland, OH: Cleveland-Hopkins International",Cleveland,OH,US,False,True,False,actual
+CLL,11049,"College Station/Bryan, TX: Easterwood Field",College Station/Bryan,TX,US,False,True,False,actual
+CLT,11057,"Charlotte, NC: Charlotte Douglas International",Charlotte,NC,US,False,True,False,actual
+CMH,11066,"Columbus, OH: John Glenn Columbus International",Columbus,OH,US,False,True,False,actual
+CMI,11067,"Champaign/Urbana, IL: University of Illinois/Willard",Champaign/Urbana,IL,US,False,True,False,actual
+CMX,11076,"Hancock/Houghton, MI: Houghton County Memorial",Hancock/Houghton,MI,US,False,True,False,actual
+COD,11097,"Cody, WY: Yellowstone Regional",Cody,WY,US,False,True,False,actual
+COS,11109,"Colorado Springs, CO: City of Colorado Springs Municipal",Colorado Springs,CO,US,False,True,False,actual
+COU,11111,"Columbia, MO: Columbia Regional",Columbia,MO,US,False,True,False,actual
+CPR,11122,"Casper, WY: Casper/Natrona County International",Casper,WY,US,False,True,False,actual
+CRP,11140,"Corpus Christi, TX: Corpus Christi International",Corpus Christi,TX,US,False,True,False,actual
+CRW,11146,"Charleston/Dunbar, WV: West Virginia International Yeager",Charleston/Dunbar,WV,US,False,True,False,actual
+CSG,11150,"Columbus, GA: Columbus Airport",Columbus,GA,US,False,True,False,actual
+CUN,11032,"Cancun, Mexico: Cancun International",Cancun,Mexico,MX,False,False,True,actual
+CVG,11193,"Cincinnati, OH: Cincinnati/Northern Kentucky International",Cincinnati,OH,US,False,True,False,actual
+CWA,11203,"Mosinee, WI: Central Wisconsin",Mosinee,WI,US,False,True,False,actual
+CYS,11233,"Cheyenne, WY: Cheyenne Regional/Jerry Olson Field",Cheyenne,WY,US,False,True,False,actual
+CZM,11244,"Cozumel, Mexico: Cozumel International",Cozumel,Mexico,MX,False,False,True,actual
+DAL,11259,"Dallas, TX: Dallas Love Field",Dallas,TX,US,False,True,False,actual
+DAY,11267,"Dayton, OH: James M Cox/Dayton International",Dayton,OH,US,False,True,False,actual
+DCA,11278,"Washington, DC: Ronald Reagan Washington National",Washington,DC,US,False,True,False,actual
+DEC,11288,"Decatur, IL: Decatur Airport",Decatur,IL,US,False,True,False,actual
+DEL,11290,"Delhi, India: Indira Gandhi International",Delhi,India,IN,False,False,True,actual
+DEN,11292,"Denver, CO: Denver International",Denver,CO,US,False,True,False,actual
+DFW,11298,"Dallas/Fort Worth, TX: Dallas/Fort Worth International",Dallas/Fort Worth,TX,US,False,True,False,actual
+DJT,14027,"West Palm Beach/Palm Beach, FL: Donald J Trump International",West Palm Beach/Palm Beach,FL,US,False,True,False,actual
+DLH,11337,"Duluth, MN: Duluth International",Duluth,MN,US,False,True,False,actual
+DRO,11413,"Durango, CO: Durango La Plata County",Durango,CO,US,False,True,False,actual
+DSM,11423,"Des Moines, IA: Des Moines International",Des Moines,IA,US,False,True,False,actual
+DTW,11433,"Detroit, MI: Detroit Metro Wayne County",Detroit,MI,US,False,True,False,actual
+DUB,11435,"Dublin, Ireland: Dublin Airport",Dublin,Ireland,IE,False,False,True,actual
+DVL,11447,"Devils Lake, ND: Devils Lake Regional",Devils Lake,ND,US,False,True,False,actual
+EAR,11468,"Kearney, NE: Kearney Regional",Kearney,NE,US,False,True,False,actual
+EAU,11471,"Eau Claire, WI: Chippewa Valley Regional",Eau Claire,WI,US,False,True,False,actual
+ECP,11481,"Panama City, FL: Northwest Florida Beaches International",Panama City,FL,US,False,True,False,actual
+EDI,11488,"Edinburgh, United Kingdom: Edinburgh Airport",Edinburgh,United Kingdom,GB,False,False,True,actual
+EGE,11503,"Eagle, CO: Eagle County Regional",Eagle,CO,US,False,True,False,actual
+ELP,11540,"El Paso, TX: El Paso International",El Paso,TX,US,False,True,False,actual
+ERI,11577,"Erie, PA: Erie International/Tom Ridge Field",Erie,PA,US,False,True,False,actual
+EUG,11603,"Eugene, OR: Mahlon Sweet Field",Eugene,OR,US,False,True,False,actual
+EVV,11612,"Evansville, IN: Evansville Regional",Evansville,IN,US,False,True,False,actual
+EWR,11618,"Newark, NJ: Newark Liberty International",Newark,NJ,US,False,True,False,actual
+EYW,11624,"Key West, FL: Key West International",Key West,FL,US,False,True,False,actual
+FAI,11630,"Fairbanks, AK: Fairbanks International",Fairbanks,AK,US,False,True,False,actual
+FAR,11637,"Fargo, ND: Hector International",Fargo,ND,US,False,True,False,actual
+FAT,11638,"Fresno, CA: Fresno Yosemite International",Fresno,CA,US,False,True,False,actual
+FAY,11641,"Fayetteville, NC: Fayetteville Regional/Grannis Field",Fayetteville,NC,US,False,True,False,actual
+FCA,11648,"Kalispell, MT: Glacier Park International",Kalispell,MT,US,False,True,False,actual
+FCO,11651,"Rome, Italy: Fiumicino",Rome,Italy,IT,False,False,True,actual
+FLL,11697,"Fort Lauderdale, FL: Fort Lauderdale-Hollywood International",Fort Lauderdale,FL,US,False,True,False,actual
+FNT,11721,"Flint, MI: Bishop International",Flint,MI,US,False,True,False,actual
+FOD,11725,"Fort Dodge, IA: Fort Dodge Regional",Fort Dodge,IA,US,False,True,False,actual
+FOE,11726,"Topeka, KS: Topeka Regional",Topeka,KS,US,False,True,False,actual
+FRA,11760,"Frankfurt, Germany: Frankfurt Main",Frankfurt,Germany,DE,False,False,True,actual
+FRG,11764,"East Farmingdale, NY: Republic",East Farmingdale,NY,US,False,True,False,actual
+FSD,11775,"Sioux Falls, SD: Joe Foss Field",Sioux Falls,SD,US,False,True,False,actual
+FWA,11823,"Fort Wayne, IN: Fort Wayne International",Fort Wayne,IN,US,False,True,False,actual
+FYV,11834,"Fayetteville, AR: Drake Field",Fayetteville,AR,US,False,True,False,actual
+GCK,11867,"Garden City, KS: Garden City Regional",Garden City,KS,US,False,True,False,actual
+GCM,11868,"Grand Cayman, Cayman Islands: Owen Roberts International",Grand Cayman,Cayman Islands,KY,False,False,True,actual
+GDL,11874,"Guadalajara, Mexico: Guadalajara International",Guadalajara,Mexico,MX,False,False,True,actual
+GEG,11884,"Spokane, WA: Spokane International",Spokane,WA,US,False,True,False,actual
+GFK,11898,"Grand Forks, ND: Grand Forks International",Grand Forks,ND,US,False,True,False,actual
+GIG,11915,"Rio de Janeiro, Brazil: Galeao Antonio Carlos Jobim International",Rio de Janeiro,Brazil,BR,False,False,True,actual
+GJT,11921,"Grand Junction, CO: Grand Junction Regional",Grand Junction,CO,US,False,True,False,actual
+GLA,11928,"Glasgow, United Kingdom: Glasgow Airport",Glasgow,United Kingdom,GB,False,False,True,actual
+GNV,11953,"Gainesville, FL: Gainesville Regional",Gainesville,FL,US,False,True,False,actual
+GPT,11973,"Gulfport/Biloxi, MS: Gulfport-Biloxi International",Gulfport/Biloxi,MS,US,False,True,False,actual
+GRB,11977,"Green Bay, WI: Green Bay Austin Straubel International",Green Bay,WI,US,False,True,False,actual
+GRI,11980,"Grand Island, NE: Central Nebraska Regional",Grand Island,NE,US,False,True,False,actual
+GRK,11982,"Killeen, TX: Robert Gray AAF",Killeen,TX,US,False,True,False,actual
+GRR,11986,"Grand Rapids, MI: Gerald R. Ford International",Grand Rapids,MI,US,False,True,False,actual
+GRU,11988,"Sao Paulo, Brazil: Guarulhos Gov Andre Franco Montoro",Sao Paulo,Brazil,BR,False,False,True,actual
+GSO,11995,"Greensboro/High Point, NC: Piedmont Triad International",Greensboro/High Point,NC,US,False,True,False,actual
+GSP,11996,"Greer, SC: Greenville-Spartanburg International",Greer,SC,US,False,True,False,actual
+GTF,12003,"Great Falls, MT: Great Falls International",Great Falls,MT,US,False,True,False,actual
+GUA,12010,"Guatemala City, Guatemala: La Aurora International",Guatemala City,Guatemala,GT,False,False,True,actual
+GUC,12012,"Gunnison, CO: Gunnison-Crested Butte Regional",Gunnison,CO,US,False,True,False,actual
+HDN,12094,"Hayden, CO: Yampa Valley",Hayden,CO,US,False,True,False,actual
+HHH,12124,"Hilton Head, SC: Hilton Head Airport",Hilton Head,SC,US,False,True,False,actual
+HIB,12129,"Hibbing, MN: Range Regional",Hibbing,MN,US,False,True,False,actual
+HKG,12143,"Hong Kong, Hong Kong: Hong Kong International",Hong Kong,Hong Kong,HK,False,False,True,actual
+HLN,12156,"Helena, MT: Helena Regional",Helena,MT,US,False,True,False,actual
+HND,12169,"Tokyo, Japan: Tokyo International",Tokyo,Japan,JP,False,False,True,actual
+HNL,12173,"Honolulu, HI: Daniel K Inouye International",Honolulu,HI,US,False,True,False,actual
+HOU,12191,"Houston, TX: William P Hobby",Houston,TX,US,False,True,False,actual
+HPN,12197,"White Plains, NY: Westchester County",White Plains,NY,US,False,True,False,actual
+HRL,12206,"Harlingen/San Benito, TX: Valley International",Harlingen/San Benito,TX,US,False,True,False,actual
+HSV,12217,"Huntsville, AL: Huntsville International-Carl T Jones Field",Huntsville,AL,US,False,True,False,actual
+HUF,12228,"Terre Haute, IN: Terre Haute Regional",Terre Haute,IN,US,False,True,False,actual
+HYA,12250,"Hyannis, MA: Cape Cod Gateway",Hyannis,MA,US,False,True,False,actual
+HYS,12255,"Hays, KS: Hays Regional",Hays,KS,US,False,True,False,actual
+IAB,12263,"Wichita, KS: McConnell AFB",Wichita,KS,US,False,True,False,actual
+IAD,12264,"Washington, DC: Washington Dulles International",Washington,DC,US,False,True,False,actual
+IAH,12266,"Houston, TX: George Bush Intercontinental/Houston",Houston,TX,US,False,True,False,actual
+ICT,12278,"Wichita, KS: Wichita Dwight D Eisenhower National",Wichita,KS,US,False,True,False,actual
+IDA,12280,"Idaho Falls, ID: Idaho Falls Regional",Idaho Falls,ID,US,False,True,False,actual
+ILM,12323,"Wilmington, NC: Wilmington International",Wilmington,NC,US,False,True,False,actual
+IND,12339,"Indianapolis, IN: Indianapolis International",Indianapolis,IN,US,False,True,False,actual
+INT,12348,"Winston-Salem, NC: Smith Reynolds",Winston-Salem,NC,US,False,True,False,actual
+ITH,12397,"Ithaca/Cortland, NY: Ithaca Tompkins International",Ithaca/Cortland,NY,US,False,True,False,actual
+JAC,12441,"Jackson, WY: Jackson Hole",Jackson,WY,US,False,True,False,actual
+JAN,12448,"Jackson/Vicksburg, MS: Jackson Medgar Wiley Evers International",Jackson/Vicksburg,MS,US,False,True,False,actual
+JAX,12451,"Jacksonville, FL: Jacksonville International",Jacksonville,FL,US,False,True,False,actual
+JFK,12478,"New York, NY: John F. Kennedy International",New York,NY,US,False,True,False,actual
+JLN,12511,"Joplin, MO: Joplin Regional",Joplin,MO,US,False,True,False,actual
+JMS,12519,"Jamestown, ND: Jamestown Regional",Jamestown,ND,US,False,True,False,actual
+JST,12559,"Johnstown, PA: John Murtha Johnstown-Cambria County",Johnstown,PA,US,False,True,False,actual
+KEF,12651,"Keflavik/Reykjavik, Iceland: Keflavik International",Keflavik/Reykjavik,Iceland,IS,False,False,True,actual
+KIN,12693,"Kingston, Jamaica: Norman Manley International",Kingston,Jamaica,JM,False,False,True,actual
+KOA,12758,"Kona, HI: Ellison Onizuka Kona International at Keahole",Kona,HI,US,False,True,False,actual
+LAF,12878,"Lafayette, IN: Purdue University",Lafayette,IN,US,False,True,False,actual
+LAN,12884,"Lansing, MI: Capital Region International",Lansing,MI,US,False,True,False,actual
+LAS,12889,"Las Vegas, NV: Harry Reid International",Las Vegas,NV,US,False,True,False,actual
+LAX,12892,"Los Angeles, CA: Los Angeles International",Los Angeles,CA,US,False,True,False,actual
+LBB,12896,"Lubbock, TX: Lubbock Preston Smith International",Lubbock,TX,US,False,True,False,actual
+LBF,12899,"North Platte, NE: North Platte Regional Airport Lee Bird Field",North Platte,NE,US,False,True,False,actual
+LEX,12945,"Lexington, KY: Blue Grass",Lexington,KY,US,False,True,False,actual
+LFT,12951,"Lafayette, LA: Lafayette Regional Paul Fournet Field",Lafayette,LA,US,False,True,False,actual
+LGA,12953,"New York, NY: LaGuardia",New York,NY,US,False,True,False,actual
+LGW,12966,"London, United Kingdom: London Gatwick",London,United Kingdom,GB,False,False,True,actual
+LHR,12972,"London, United Kingdom: London Heathrow",London,United Kingdom,GB,False,False,True,actual
+LIM,12986,"Lima, Peru: Jorge Chavez International",Lima,Peru,PE,False,False,True,actual
+LIR,12990,"Liberia, Costa Rica: Daniel Oduber International",Liberia,Costa Rica,CR,False,False,True,actual
+LIT,12992,"Little Rock, AR: Bill and Hillary Clinton Nat Adams Field",Little Rock,AR,US,False,True,False,actual
+LNK,13029,"Lincoln, NE: Lincoln Airport",Lincoln,NE,US,False,True,False,actual
+LNS,13032,"Lancaster, PA: Lancaster Airport",Lancaster,PA,US,False,True,False,actual
+LSE,13076,"La Crosse, WI: La Crosse Regional",La Crosse,WI,US,False,True,False,actual
+LUK,13105,"Cincinnati, OH: Cincinnati Municipal Lunken Field",Cincinnati,OH,US,False,True,False,actual
+LWB,13121,"Lewisburg, WV: Greenbrier Valley",Lewisburg,WV,US,False,True,False,actual
+LYH,13139,"Lynchburg, VA: Lynchburg Regional/Preston Glenn Field",Lynchburg,VA,US,False,True,False,actual
+MAF,13158,"Midland/Odessa, TX: Midland International Air and Space Port",Midland/Odessa,TX,US,False,True,False,actual
+MBJ,13180,"Montego Bay, Jamaica: Sangster International",Montego Bay,Jamaica,JM,False,False,True,actual
+MBS,13184,"Saginaw/Bay City/Midland, MI: MBS International",Saginaw/Bay City/Midland,MI,US,False,True,False,actual
+MCI,13198,"Kansas City, MO: Kansas City International",Kansas City,MO,US,False,True,False,actual
+MCN,13203,"Macon, GA: Middle Georgia Regional",Macon,GA,US,False,True,False,actual
+MCO,13204,"Orlando, FL: Orlando International",Orlando,FL,US,False,True,False,actual
+MCW,13211,"Mason City, IA: Mason City Municipal",Mason City,IA,US,False,True,False,actual
+MDT,13230,"Harrisburg, PA: Harrisburg International",Harrisburg,PA,US,False,True,False,actual
+MDW,13232,"Chicago, IL: Chicago Midway International",Chicago,IL,US,False,True,False,actual
+MEI,13241,"Meridian, MS: Key Field",Meridian,MS,US,False,True,False,actual
+MEM,13244,"Memphis, TN: Memphis International",Memphis,TN,US,False,True,False,actual
+MEX,13252,"Mexico City, Mexico: Mexico City International",Mexico City,Mexico,MX,False,False,True,actual
+MGA,13269,"Managua, Nicaragua: Augusto Cesar Sandino International",Managua,Nicaragua,NI,False,False,True,actual
+MGM,13277,"Montgomery, AL: Montgomery Regional",Montgomery,AL,US,False,True,False,actual
+MGW,13282,"Morgantown, WV: Morgantown Municipal Walter L Bill Hart Field",Morgantown,WV,US,False,True,False,actual
+MHK,13290,"Manhattan/Ft. Riley, KS: Manhattan Regional",Manhattan/Ft. Riley,KS,US,False,True,False,actual
+MHT,13296,"Manchester, NH: Manchester Boston Regional",Manchester,NH,US,False,True,False,actual
+MIA,13303,"Miami, FL: Miami International",Miami,FL,US,False,True,False,actual
+MID,13306,"Merida, Mexico: Merida International",Merida,Mexico,MX,False,False,True,actual
+MKE,13342,"Milwaukee, WI: General Mitchell International",Milwaukee,WI,US,False,True,False,actual
+MKG,13344,"Muskegon, MI: Muskegon County",Muskegon,MI,US,False,True,False,actual
+MLB,13360,"Melbourne, FL: Melbourne Orlando International",Melbourne,FL,US,False,True,False,actual
+MLI,13367,"Moline, IL: Quad Cities International",Moline,IL,US,False,True,False,actual
+MLM,13370,"Morelia, Mexico: Morelia International",Morelia,Mexico,MX,False,False,True,actual
+MOB,13422,"Mobile, AL: Mobile Regional",Mobile,AL,US,False,True,False,actual
+MOT,13433,"Minot, ND: Minot International",Minot,ND,US,False,True,False,actual
+MQT,13459,"Marquette, MI: Marquette Sawyer Regional",Marquette,MI,US,False,True,False,actual
+MRY,13476,"Monterey, CA: Monterey Regional",Monterey,CA,US,False,True,False,actual
+MSN,13485,"Madison, WI: Dane County Regional-Truax Field",Madison,WI,US,False,True,False,actual
+MSO,13486,"Missoula, MT: Missoula Montana",Missoula,MT,US,False,True,False,actual
+MSP,13487,"Minneapolis, MN: Minneapolis-St Paul International",Minneapolis,MN,US,False,True,False,actual
+MSY,13495,"New Orleans, LA: Louis Armstrong New Orleans International",New Orleans,LA,US,False,True,False,actual
+MTJ,13502,"Montrose/Delta, CO: Montrose Regional",Montrose/Delta,CO,US,False,True,False,actual
+MTY,13514,"Monterrey, Mexico: Monterrey International",Monterrey,Mexico,MX,False,False,True,actual
+MUC,13518,"Munich, Germany: Muenchen",Munich,Germany,DE,False,False,True,actual
+MVY,13541,"Martha's Vineyard, MA: Martha's Vineyard Airport",Martha's Vineyard,MA,US,False,True,False,actual
+MWA,13543,"Marion/Herrin, IL: Veterans Airport of Southern Illinois",Marion/Herrin,IL,US,False,True,False,actual
+MXP,13560,"Milan, Italy: Malpensa",Milan,Italy,IT,False,False,True,actual
+MYR,13577,"Myrtle Beach, SC: Myrtle Beach International",Myrtle Beach,SC,US,False,True,False,actual
+MZT,13594,"Mazatlan, Mexico: Mazatlan International",Mazatlan,Mexico,MX,False,False,True,actual
+NAS,13605,"Nassau, The Bahamas: Lynden Pindling International",Nassau,The Bahamas,BS,False,False,True,actual
+NCE,13625,"Nice, France: Nice Cote D Azur",Nice,France,FR,False,False,True,actual
+NRT,13744,"Tokyo, Japan: Narita International",Tokyo,Japan,JP,False,False,True,actual
+OAK,13796,"Oakland, CA: Oakland International",Oakland,CA,US,False,True,False,actual
+OGG,13830,"Kahului, HI: Kahului Airport",Kahului,HI,US,False,True,False,actual
+OGS,13832,"Ogdensburg, NY: Ogdensburg International",Ogdensburg,NY,US,False,True,False,actual
+OKC,13851,"Oklahoma City, OK: Okc Will Rogers International",Oklahoma City,OK,US,False,True,False,actual
+OMA,13871,"Omaha, NE: Eppley Airfield",Omaha,NE,US,False,True,False,actual
+ONT,13891,"Ontario, CA: Ontario International",Ontario,CA,US,False,True,False,actual
+ORD,13930,"Chicago, IL: Chicago O'Hare International",Chicago,IL,US,True,True,True,actual
+ORF,13931,"Norfolk, VA: Norfolk International",Norfolk,VA,US,False,True,False,actual
+OWB,13983,"Owensboro, KY: Owensboro Daviess County Regional",Owensboro,KY,US,False,True,False,actual
+PAH,14006,"Paducah, KY: Barkley Regional",Paducah,KY,US,False,True,False,actual
+PBG,14025,"Plattsburgh, NY: Plattsburgh International",Plattsburgh,NY,US,False,True,False,actual
+PBI,14027,"West Palm Beach/Palm Beach, FL: Palm Beach International",West Palm Beach/Palm Beach,FL,US,False,True,False,actual
+PDX,14057,"Portland, OR: Portland International",Portland,OR,US,False,True,False,actual
+PEK,14066,"Beijing, China: Capital International",Beijing,China,CN,False,False,True,actual
+PGV,14092,"Greenville, NC: Pitt Greenville",Greenville,NC,US,False,True,False,actual
+PHL,14100,"Philadelphia, PA: Philadelphia International",Philadelphia,PA,US,False,True,False,actual
+PHX,14107,"Phoenix, AZ: Phoenix Sky Harbor International",Phoenix,AZ,US,False,True,False,actual
+PIA,14108,"Peoria, IL: General Downing - Peoria International",Peoria,IL,US,False,True,False,actual
+PIB,14109,"Hattiesburg/Laurel, MS: Hattiesburg-Laurel Regional",Hattiesburg/Laurel,MS,US,False,True,False,actual
+PIR,14120,"Pierre, SD: Pierre Regional",Pierre,SD,US,False,True,False,actual
+PIT,14122,"Pittsburgh, PA: Pittsburgh International",Pittsburgh,PA,US,False,True,False,actual
+PLN,14150,"Pellston, MI: Pellston Regional Emmet County",Pellston,MI,US,False,True,False,actual
+PLS,14153,"Providenciales, Turks and Caicos Islands: Providenciales International",Providenciales,Turks and Caicos Islands,TC,False,False,True,actual
+PNS,14193,"Pensacola, FL: Pensacola International",Pensacola,FL,US,False,True,False,actual
+POP,14207,"Puerto Plata, Dominican Republic: Gregorio Luperon International",Puerto Plata,Dominican Republic,DO,False,False,True,actual
+PSC,14252,"Pasco/Kennewick/Richland, WA: Tri Cities",Pasco/Kennewick/Richland,WA,US,False,True,False,actual
+PSP,14262,"Palm Springs, CA: Palm Springs International",Palm Springs,CA,US,False,True,False,actual
+PTY,14286,"Panama City, Panama: Tocumen International",Panama City,Panama,PA,False,False,True,actual
+PUJ,14293,"Punta Cana, Dominican Republic: Punta Cana International",Punta Cana,Dominican Republic,DO,False,False,True,actual
+PVD,14307,"Providence, RI: Rhode Island Tf Green International",Providence,RI,US,False,True,False,actual
+PVG,14309,"Shanghai, China: Pudong",Shanghai,China,CN,False,False,True,actual
+PVR,14312,"Puerto Vallarta, Mexico: Puerto Vallarta International",Puerto Vallarta,Mexico,MX,False,False,True,actual
+PVU,14314,"Provo, UT: Provo Municipal",Provo,UT,US,False,True,False,actual
+PWM,14321,"Portland, ME: Portland International Jetport",Portland,ME,US,False,True,False,actual
+QRO,16477,"Queretaro, Mexico: Queretaro International",Queretaro,Mexico,MX,False,False,True,actual
+RAP,14457,"Rapid City, SD: Rapid City Regional",Rapid City,SD,US,False,True,False,actual
+RDM,14489,"Bend/Redmond, OR: Roberts Field",Bend/Redmond,OR,US,False,True,False,actual
+RDU,14492,"Raleigh/Durham, NC: Raleigh-Durham International",Raleigh/Durham,NC,US,False,True,False,actual
+RFD,14512,"Rockford, IL: Chicago/Rockford International",Rockford,IL,US,False,True,False,actual
+RHI,14520,"Rhinelander, WI: Rhinelander/Oneida County",Rhinelander,WI,US,False,True,False,actual
+RIC,14524,"Richmond, VA: Richmond International",Richmond,VA,US,False,True,False,actual
+RKS,14543,"Rock Springs, WY: Southwest Wyoming Regional",Rock Springs,WY,US,False,True,False,actual
+RNO,14570,"Reno, NV: Reno/Tahoe International",Reno,NV,US,False,True,False,actual
+ROA,14574,"Roanoke, VA: Roanoke Blacksburg Regional",Roanoke,VA,US,False,True,False,actual
+ROC,14576,"Rochester, NY: Frederick Douglass Grtr Rochester International",Rochester,NY,US,False,True,False,actual
+ROW,14588,"Roswell, NM: Roswell Air Center",Roswell,NM,US,False,True,False,actual
+RST,14633,"Rochester, MN: Rochester International",Rochester,MN,US,False,True,False,actual
+RSW,14635,"Fort Myers, FL: Southwest Florida International",Fort Myers,FL,US,False,True,False,actual
+SAF,14674,"Santa Fe, NM: Santa Fe Regional",Santa Fe,NM,US,False,True,False,actual
+SAL,14677,"San Salvador, El Salvador: San Oscar A Romero and Galdamez International",San Salvador,El Salvador,SV,False,False,True,actual
+SAN,14679,"San Diego, CA: San Diego International",San Diego,CA,US,False,True,False,actual
+SAT,14683,"San Antonio, TX: San Antonio International",San Antonio,TX,US,False,True,False,actual
+SAV,14685,"Savannah, GA: Savannah/Hilton Head International",Savannah,GA,US,False,True,False,actual
+SBA,14689,"Santa Barbara, CA: Santa Barbara Municipal",Santa Barbara,CA,US,False,True,False,actual
+SBN,14696,"South Bend, IN: South Bend International",South Bend,IN,US,False,True,False,actual
+SCE,14711,"State College, PA: State College Regional",State College,PA,US,False,True,False,actual
+SDF,14730,"Louisville, KY: Louisville Muhammad Ali International",Louisville,KY,US,False,True,False,actual
+SEA,14747,"Seattle, WA: Seattle/Tacoma International",Seattle,WA,US,False,True,False,actual
+SFO,14771,"San Francisco, CA: San Francisco International",San Francisco,CA,US,False,True,False,actual
+SGF,14783,"Springfield, MO: Springfield-Branson National",Springfield,MO,US,False,True,False,actual
+SGU,14794,"St. George, UT: St George Regional",St. George,UT,US,False,True,False,actual
+SHD,14802,"Staunton, VA: Shenandoah Valley Regional",Staunton,VA,US,False,True,False,actual
+SHV,14814,"Shreveport, LA: Shreveport Regional",Shreveport,LA,US,False,True,False,actual
+SJC,14831,"San Jose, CA: Norman Y. Mineta San Jose International",San Jose,CA,US,False,True,False,actual
+SJD,14832,"San Jose del Cabo, Mexico: San Jose del Cabo International",San Jose del Cabo,Mexico,MX,False,False,True,actual
+SJO,14838,"San Jose, Costa Rica: Juan Santamaria International",San Jose,Costa Rica,CR,False,False,True,actual
+SJU,14843,"San Juan, PR: Luis Munoz Marin International",San Juan,PR,US,False,True,False,actual
+SLC,14869,"Salt Lake City, UT: Salt Lake City International",Salt Lake City,UT,US,False,True,False,actual
+SLK,14875,"Saranac Lake/Lake Placid, NY: Adirondack Regional",Saranac Lake/Lake Placid,NY,US,False,True,False,actual
+SLN,14877,"Salina, KS: Salina Regional",Salina,KS,US,False,True,False,actual
+SMF,14893,"Sacramento, CA: Sacramento International",Sacramento,CA,US,False,True,False,actual
+SNA,14908,"Santa Ana, CA: John Wayne Airport-Orange County",Santa Ana,CA,US,False,True,False,actual
+SNN,14918,"Shannon, Ireland: Shannon Airport",Shannon,Ireland,IE,False,False,True,actual
+SPI,14952,"Springfield, IL: Abraham Lincoln Capital",Springfield,IL,US,False,True,False,actual
+SRQ,14986,"Sarasota/Bradenton, FL: Sarasota/Bradenton International",Sarasota/Bradenton,FL,US,False,True,False,actual
+STL,15016,"St. Louis, MO: St Louis Lambert International",St. Louis,MO,US,False,True,False,actual
+STT,15024,"Charlotte Amalie, VI: Cyril E King",Charlotte Amalie,VI,US,False,True,False,actual
+SUN,15041,"Sun Valley/Hailey/Ketchum, ID: Friedman Memorial",Sun Valley/Hailey/Ketchum,ID,US,False,True,False,actual
+SUX,15048,"Sioux City, IA: Sioux Gateway Brig Gen Bud Day Field",Sioux City,IA,US,False,True,False,actual
+SWF,15070,"Newburgh/Poughkeepsie, NY: New York Stewart International",Newburgh/Poughkeepsie,NY,US,False,True,False,actual
+SWO,15074,"Stillwater, OK: Stillwater Regional",Stillwater,OK,US,False,True,False,actual
+SXM,15084,"Philipsburg, Sint Maarten: Princess Juliana International",Philipsburg,Sint Maarten,SX,False,False,True,actual
+SYR,15096,"Syracuse, NY: Syracuse Hancock International",Syracuse,NY,US,False,True,False,actual
+TCL,15153,"Tuscaloosa, AL: Tuscaloosa National",Tuscaloosa,AL,US,False,True,False,actual
+TEB,15167,"Teterboro, NJ: Teterboro Airport",Teterboro,NJ,US,False,True,False,actual
+TLH,15249,"Tallahassee, FL: Tallahassee International",Tallahassee,FL,US,False,True,False,actual
+TLV,15258,"Tel Aviv, Israel: Ben Gurion",Tel Aviv,Israel,IL,False,False,True,actual
+TPA,15304,"Tampa, FL: Tampa International",Tampa,FL,US,False,True,False,actual
+TQO,16998,"Tulum, Mexico: Felipe Carrillo Puerto",Tulum,Mexico,MX,False,False,True,actual
+TTN,15356,"Trenton, NJ: Trenton Mercer",Trenton,NJ,US,False,True,False,actual
+TUL,15370,"Tulsa, OK: Tulsa International",Tulsa,OK,US,False,True,False,actual
+TUP,15374,"Tupelo, MS: Tupelo Regional",Tupelo,MS,US,False,True,False,actual
+TUS,15376,"Tucson, AZ: Tucson International",Tucson,AZ,US,False,True,False,actual
+TVC,15380,"Traverse City, MI: Cherry Capital",Traverse City,MI,US,False,True,False,actual
+TWF,15389,"Twin Falls, ID: Joslin Field - Magic Valley Regional",Twin Falls,ID,US,False,True,False,actual
+TYS,15412,"Knoxville, TN: McGhee Tyson",Knoxville,TN,US,False,True,False,actual
+UIN,15454,"Quincy, IL: Quincy Regional-Baldwin Field",Quincy,IL,US,False,True,False,actual
+UOX,15481,"Oxford, MS: University-Oxford",Oxford,MS,US,False,True,False,actual
+UVF,15513,"St. Lucia, Saint Lucia: Hewanorra International",St. Lucia,Saint Lucia,LC,False,False,True,actual
+VPS,15624,"Valparaiso, FL: Eglin AFB Destin Fort Walton Beach",Valparaiso,FL,US,False,True,False,actual
+XNA,15919,"Fayetteville, AR: Northwest Arkansas National",Fayetteville,AR,US,False,True,False,actual
+XWA,16869,"Williston, ND: Williston Basin International",Williston,ND,US,False,True,False,actual
+YEG,16042,"Edmonton, Canada: Edmonton International",Edmonton,Canada,CA,False,False,True,actual
+YHZ,16085,"Halifax, Canada: Stanfield International",Halifax,Canada,CA,False,False,True,actual
+YIP,16091,"Detroit, MI: Willow Run",Detroit,MI,US,False,True,False,actual
+YJT,16095,"Stephenville, Canada: Stephenville Dymond",Stephenville,Canada,CA,False,False,True,actual
+YOW,16149,"Ottawa, Canada: Macdonald Cartier International",Ottawa,Canada,CA,False,False,True,actual
+YQB,16163,"Quebec, Canada: Jean Lesage International",Quebec,Canada,CA,False,False,True,actual
+YQX,16178,"Gander, Canada: Gander International",Gander,Canada,CA,False,False,True,actual
+YUL,16217,"Montreal, Canada: Pierre Elliott Trudeau International",Montreal,Canada,CA,False,False,True,actual
+YUM,16218,"Yuma, AZ: Yuma MCAS/Yuma International",Yuma,AZ,US,False,True,False,actual
+YVR,16229,"Vancouver, Canada: Vancouver International",Vancouver,Canada,CA,False,False,True,actual
+YWG,16232,"Winnipeg, Canada: James Armstrong Richardson International",Winnipeg,Canada,CA,False,False,True,actual
+YYC,16257,"Calgary, Canada: Yyc Calgary International",Calgary,Canada,CA,False,False,True,actual
+YYT,16268,"St. John's, Canada: St. John's International",St. John's,Canada,CA,False,False,True,actual
+YYZ,16271,"Toronto, Canada: Lester B. Pearson International",Toronto,Canada,CA,False,False,True,actual
+ZIH,16304,"Ixtapa/Zihuatanejo, Mexico: Ixtapa-Zihuatanejo International",Ixtapa/Zihuatanejo,Mexico,MX,False,False,True,actual
+ZRH,16321,"Zurich, Switzerland: Zurich Airport",Zurich,Switzerland,CH,False,False,True,actual

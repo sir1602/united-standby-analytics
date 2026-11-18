@@ -1,0 +1,10 @@
+op_carrier,carrier_name,carrier_group,is_mainline,is_shared_cpa_carrier,history_summary,history_era_count,confidence_tier
+AX,Trans States Airlines,EXPRESS,False,False,Trans States Airlines (2002 - ),1,actual
+C5,CommuteAir LLC dba CommuteAir,EXPRESS,False,False,"Commutair Aka Champlain Enterprises, Inc. (2005 - 2022) | CommuteAir LLC dba CommuteAir (2022 - )",2,actual
+EV,ExpressJet Airlines LLC d/b/a aha!,EXPRESS,False,False,Atlantic Southeast Airlines (1993 - 2011) | ExpressJet Airlines Inc. (2012 - 2019) | ExpressJet Airlines LLC (2019 - 2021) | ExpressJet Airlines LLC d/b/a aha! (2021 - ),4,actual
+G7,GoJet Airlines LLC d/b/a United Express,EXPRESS,False,False,GoJet Airlines LLC d/b/a United Express (2005 - ),1,actual
+OO,SkyWest Airlines Inc.,EXPRESS,False,True,SkyWest Airlines Inc. (2003 - ),1,actual
+UA,United Air Lines Inc.,MAINLINE,True,False,United Air Lines Inc. (1960 - ),1,actual
+YV,Mesa Airlines Inc.,EXPRESS,False,True,Mesa Airlines Inc. (1995 - ),1,actual
+YX,Republic Airline,EXPRESS,False,True,"Midwest Airline, Inc. (2003 - 2009) | Midwest Express Airlines (1984 - 2003) | Republic Airline (2017 - ) | Republic Airlines (2009 - 2016)",4,actual
+ZW,Air Wisconsin Airlines Corp,EXPRESS,False,True,Air Wisconsin Airlines Corp (1994 - ) | Air Wisconsin Inc. (1979 - 1993),2,actual

@@ -1,0 +1,46 @@
+pillar,metric_group,metric_name,metric_value,sample_n,status_or_gate,notes
+Coverage & Invariants,Dataset Scope,total_flights,830941.0,830941,PASS,"hub=ORD, sample_mode=False"
+Coverage & Invariants,soi_historical,mean,61.7269,814847,INFO,Completed flights only (is_cancelled = FALSE)
+Coverage & Invariants,soi_historical,median,61.79,814847,INFO,Completed flights only (is_cancelled = FALSE)
+Coverage & Invariants,soi_historical,std,15.9864,814847,INFO,Completed flights only (is_cancelled = FALSE)
+Coverage & Invariants,soi_historical,p10,40.53,814847,INFO,Completed flights only (is_cancelled = FALSE)
+Coverage & Invariants,soi_historical,p90,83.02,814847,INFO,Completed flights only (is_cancelled = FALSE)
+Coverage & Invariants,soi_planning,mean,58.0863,626838,INFO,Leakage-free 2023-2026 (2019 = NULL)
+Coverage & Invariants,soi_planning,median,57.97,626838,INFO,Leakage-free 2023-2026 (2019 = NULL)
+Coverage & Invariants,soi_planning,std,15.6458,626838,INFO,Leakage-free 2023-2026 (2019 = NULL)
+Coverage & Invariants,soi_planning,p10,37.61,626838,INFO,Leakage-free 2023-2026 (2019 = NULL)
+Coverage & Invariants,soi_planning,p90,78.97,626838,INFO,Leakage-free 2023-2026 (2019 = NULL)
+Coverage & Invariants,SC-5,total_violations,0.0,830941,PASS,Checked 0 unmatched T-100 row(s); silent imputation violations=0
+Coverage & Invariants,SOI-BOUNDS,total_violations,0.0,830941,PASS,Checked 10 SOI score/sub-score columns; out-of-bounds violations=0
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,spearman_rho,0.653,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,top_decile_hit_rate,0.5312,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,top_decile_lift,5.3124,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,planning_coverage_pct,0.9922,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,mae,11.458,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,fixed_holdout_2025_2026,rmse,14.6787,309930,PASS,"Consistency vs soi_historical (same T-100 baseline), not ground-truth boarding"
+Pillar 1: Time-Based Backtest,walk_forward_combined_2023_2026,spearman_rho,0.6306,616564,PASS,Expanding train.year < eval.year walk-forward backtest
+Pillar 1: Time-Based Backtest,walk_forward_combined_2023_2026,top_decile_hit_rate,0.5311,616564,PASS,Expanding train.year < eval.year walk-forward backtest
+Pillar 1: Time-Based Backtest,walk_forward_combined_2023_2026,top_decile_lift,5.3105,616564,PASS,Expanding train.year < eval.year walk-forward backtest
+Pillar 1: Time-Based Backtest,walk_forward_combined_2023_2026,planning_coverage_pct,0.9933,616564,PASS,Expanding train.year < eval.year walk-forward backtest
+Pillar 2: Face Validity,soi_historical,late_jan_midweek_mean,76.9894,10109,PASS,"median=78.12, std=12.0249"
+Pillar 2: Face Validity,soi_historical,all_flights_baseline_mean,61.7269,814847,PASS,"median=61.79, std=15.9864"
+Pillar 2: Face Validity,soi_historical,spring_break_mean,59.317,40393,PASS,"median=59.56, std=14.568"
+Pillar 2: Face Validity,soi_historical,christmas_peak_mean,51.7826,20278,PASS,"median=50.69, std=15.2917"
+Pillar 2: Face Validity,soi_historical,thanksgiving_sunday_mean,46.3913,2109,PASS,"median=43.33, std=15.327"
+Pillar 2: Face Validity,soi_historical,spring_break_full_window_mean,60.4511,69135,PASS,"median=60.8, std=14.8931"
+Pillar 2: Face Validity,soi_historical,christmas_eve_and_day_mean,65.2149,3216,PASS,"median=65.71, std=12.2037"
+Pillar 2: Face Validity,soi_historical,christmas_peak_excl_eve_day_mean,49.2507,17062,PASS,"median=47.83, std=14.4716"
+Pillar 2: Face Validity,soi_planning,late_jan_midweek_mean,67.3268,7936,PASS,"median=68.685, std=13.8888"
+Pillar 2: Face Validity,soi_planning,all_flights_baseline_mean,58.0863,626838,PASS,"median=57.97, std=15.6458"
+Pillar 2: Face Validity,soi_planning,spring_break_mean,57.5441,31724,PASS,"median=57.39, std=14.1073"
+Pillar 2: Face Validity,soi_planning,christmas_peak_mean,53.6995,14514,PASS,"median=52.99, std=14.7801"
+Pillar 2: Face Validity,soi_planning,thanksgiving_sunday_mean,55.1938,1547,PASS,"median=55.07, std=15.4676"
+Pillar 2: Face Validity,soi_planning,spring_break_full_window_mean,57.8939,54657,PASS,"median=57.8, std=14.4144"
+Pillar 2: Face Validity,soi_planning,christmas_eve_and_day_mean,53.1484,2322,PASS,"median=52.595, std=14.3502"
+Pillar 2: Face Validity,soi_planning,christmas_peak_excl_eve_day_mean,53.8045,12192,PASS,"median=53.03, std=14.8588"
+Pillar 3: Weight Sensitivity,baseline,spearman_rho_vs_baseline,1.0,814847,PASS,"top10_overlap=100.0%, weights={'open_seats': 0.5, 'displacement_pressure': 0.2, 'backup_options': 0.2, 'day_holiday_demand': 0.1}"
+Pillar 3: Weight Sensitivity,seat_heavy,spearman_rho_vs_baseline,0.9833,814847,PASS,"top10_overlap=87.46%, weights={'open_seats': 0.65, 'displacement_pressure': 0.15, 'backup_options': 0.15, 'day_holiday_demand': 0.05}"
+Pillar 3: Weight Sensitivity,disruption_heavy,spearman_rho_vs_baseline,0.994,814847,PASS,"top10_overlap=94.28%, weights={'open_seats': 0.4, 'displacement_pressure': 0.3, 'backup_options': 0.2, 'day_holiday_demand': 0.1}"
+Pillar 3: Weight Sensitivity,backup_heavy,spearman_rho_vs_baseline,0.9222,814847,PASS,"top10_overlap=80.7%, weights={'open_seats': 0.4, 'displacement_pressure': 0.15, 'backup_options': 0.35, 'day_holiday_demand': 0.1}"
+Pillar 3: Weight Sensitivity,equal_weights,spearman_rho_vs_baseline,0.901,814847,PASS,"top10_overlap=77.02%, weights={'open_seats': 0.25, 'displacement_pressure': 0.25, 'backup_options': 0.25, 'day_holiday_demand': 0.25}"
+Pillar 3: Weight Sensitivity,demand_heavy,spearman_rho_vs_baseline,0.9665,814847,PASS,"top10_overlap=75.37%, weights={'open_seats': 0.4, 'displacement_pressure': 0.15, 'backup_options': 0.15, 'day_holiday_demand': 0.3}"
