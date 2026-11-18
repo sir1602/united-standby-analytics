@@ -37,7 +37,7 @@ l1_carrier_route_month_type as (
         year,
         month,
         bts_aircraft_type,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf_l1
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf_l1
     from dom_t100
     group by op_carrier, origin, dest, year, month, bts_aircraft_type
     having sum(seats) > 0 and sum(departures_performed) > 0
@@ -53,7 +53,7 @@ l2_carrier_route_month as (
         sum(departures_performed) as t100_deps_l2,
         case
             when sum(seats) > 0 and sum(departures_performed) > 0
-                then least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0))))
+                then {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0))))
             else cast(null as float64)
         end as lf_l2
     from dom_t100
@@ -66,7 +66,7 @@ l3_route_month as (
         dest,
         year,
         month,
-        least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf_l3
+        {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as lf_l3
     from dom_t100
     where is_ua_family = true
     group by origin, dest, year, month

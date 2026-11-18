@@ -20,3 +20,8 @@ united_standby_analytics:
       threads: 4
       job_execution_timeout_seconds: 300
       job_retries: 1
+    # Free local alternative to BigQuery: `dbt build --target duckdb` (see README quickstart).
+    duckdb:
+      type: duckdb
+      path: "{{ env_var('STANDBY_DUCKDB_PATH', 'data/processed/standby.duckdb') }}"
+      threads: 4

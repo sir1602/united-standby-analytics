@@ -55,7 +55,7 @@ select
     sum(seats) as seats,
     sum(passengers) as passengers,
     max(distance_miles) as distance_miles,
-    least(1.0, greatest(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as load_factor,
+    {{ bq_least() }}(1.0, {{ bq_greatest() }}(0.0, safe_divide(sum(passengers), nullif(sum(seats), 0.0)))) as load_factor,
     safe_divide(sum(seats), nullif(sum(departures_performed), 0.0)) as seats_per_departure,
     max(confidence_tier) as confidence_tier
 from source

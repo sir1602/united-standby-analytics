@@ -67,23 +67,23 @@ normalized as (
         cast(dest_airport_id as int64) as dest_airport_id,
         case
             when nullif(trim(cast(crs_dep_time as string)), '') is null then cast(null as string)
-            when lpad(regexp_replace(trim(cast(crs_dep_time as string)), r'\.0+$', ''), 4, '0') = '2400' then '0000'
-            else lpad(regexp_replace(trim(cast(crs_dep_time as string)), r'\.0+$', ''), 4, '0')
+            when lpad(regexp_replace(trim(cast(crs_dep_time as string)), '[.]0+$', ''), 4, '0') = '2400' then '0000'
+            else lpad(regexp_replace(trim(cast(crs_dep_time as string)), '[.]0+$', ''), 4, '0')
         end as crs_dep_time,
         case
             when nullif(trim(cast(dep_time as string)), '') is null then cast(null as string)
-            when lpad(regexp_replace(trim(cast(dep_time as string)), r'\.0+$', ''), 4, '0') = '2400' then '0000'
-            else lpad(regexp_replace(trim(cast(dep_time as string)), r'\.0+$', ''), 4, '0')
+            when lpad(regexp_replace(trim(cast(dep_time as string)), '[.]0+$', ''), 4, '0') = '2400' then '0000'
+            else lpad(regexp_replace(trim(cast(dep_time as string)), '[.]0+$', ''), 4, '0')
         end as dep_time,
         case
             when nullif(trim(cast(crs_arr_time as string)), '') is null then cast(null as string)
-            when lpad(regexp_replace(trim(cast(crs_arr_time as string)), r'\.0+$', ''), 4, '0') = '2400' then '0000'
-            else lpad(regexp_replace(trim(cast(crs_arr_time as string)), r'\.0+$', ''), 4, '0')
+            when lpad(regexp_replace(trim(cast(crs_arr_time as string)), '[.]0+$', ''), 4, '0') = '2400' then '0000'
+            else lpad(regexp_replace(trim(cast(crs_arr_time as string)), '[.]0+$', ''), 4, '0')
         end as crs_arr_time,
         case
             when nullif(trim(cast(arr_time as string)), '') is null then cast(null as string)
-            when lpad(regexp_replace(trim(cast(arr_time as string)), r'\.0+$', ''), 4, '0') = '2400' then '0000'
-            else lpad(regexp_replace(trim(cast(arr_time as string)), r'\.0+$', ''), 4, '0')
+            when lpad(regexp_replace(trim(cast(arr_time as string)), '[.]0+$', ''), 4, '0') = '2400' then '0000'
+            else lpad(regexp_replace(trim(cast(arr_time as string)), '[.]0+$', ''), 4, '0')
         end as arr_time,
         cast(dep_delay_min as float64) as dep_delay_min,
         cast(arr_delay_min as float64) as arr_delay_min,
@@ -124,7 +124,7 @@ with_derived_fields as (
         end as tail_num_clean,
         case
             when tail_num_norm is null then false
-            else regexp_contains(tail_num_norm, r'^N[1-9][0-9A-Z]{0,4}$')
+            else regexp_contains(tail_num_norm, '^N[1-9][0-9A-Z]{0,4}$')
         end as is_valid_us_n_number,
         origin,
         origin_airport_id,

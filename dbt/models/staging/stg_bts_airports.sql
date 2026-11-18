@@ -15,12 +15,12 @@ with airports as (
 
 airport_ids as (
     select
-        safe_cast(trim(code) as int64) as airport_id,
+        {{ safe_cast_as('trim(code)', 'int64') }} as airport_id,
         trim(description) as airport_name
     from {{ source('raw', 'bts_lookups') }}
     where lookup_table = 'L_AIRPORT_ID'
-      and safe_cast(trim(code) as int64) is not null
-    qualify row_number() over (partition by safe_cast(trim(code) as int64) order by trim(description)) = 1
+      and {{ safe_cast_as('trim(code)', 'int64') }} is not null
+    qualify row_number() over (partition by {{ safe_cast_as('trim(code)', 'int64') }} order by trim(description)) = 1
 )
 
 select

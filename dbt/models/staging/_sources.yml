@@ -8,6 +8,11 @@ sources:
       and `NONE` partition expiration (D-08).
     database: "{{ env_var('GCP_PROJECT_ID', 'flight-standby-analytics') }}"
     schema: raw
+    meta:
+      # DuckDB target only (ignored by BigQuery): read the Parquet files that
+      # `python -m standby run --dry-run` writes. Use `--vars '{raw_parquet_dir: data/processed/sample}'`
+      # for the CI sample. Paths are relative to the directory dbt is invoked from (repo root).
+      external_location: "{{ var('raw_parquet_dir', 'data/processed/full') }}/{name}.parquet"
     tables:
       - name: otp_marketing_flights
         description: "BTS Marketing Carrier On-Time Performance flights (31 base standardized columns + optional Phase 2 enrichment columns)."

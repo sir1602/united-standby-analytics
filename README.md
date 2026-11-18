@@ -180,7 +180,7 @@ This repository provides **two zero-cost BI delivery paths** from the same valid
 | [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) | **"United Standby Opportunity Explorer"** Tableau Public wireframe, relationships, `22` calculated fields, `9` views, `6` filters, and `4` mandatory disclaimers |
 | [`docs/looker_studio_dashboard_spec.md`](docs/looker_studio_dashboard_spec.md) | **Google Looker Studio** 4-page build guide, zero-blend pre-joined CSV setup, Google Maps `dest_geo_query` config, and `SOI Mode` parameter formulas |
 | [`docs/bigquery_optimization.md`](docs/bigquery_optimization.md) | Billing-enabled BigQuery setup (`D-08`, why Sandbox's 60-day expiry fails), `DAY(flight_date)` partitioning, clustering, and unpartitioned vs. pruned `bq query --dry_run` SQL |
-| [`docs/decisions.md`](docs/decisions.md) | Full Technical Decisions & Assumptions Log (**`D-01` through `D-39`**) |
+| [`docs/decisions.md`](docs/decisions.md) | Full Technical Decisions & Assumptions Log (**`D-01` through `D-40`**) |
 | [`exports/tableau/`](exports/tableau/) | 8 validated Tableau star-schema CSV extracts (`34.91 MiB` total; `fct_flights_tableau.csv` stratified `100k` rows) + `export_metadata.json` |
 | [`exports/looker/`](exports/looker/) | 4 validated Looker Studio pre-joined CSV extracts (`53.91 MiB` total; `looker_flights.csv` stratified `100k` rows) + `export_metadata.json` |
 | [`notebooks/00_phase0_validation.ipynb`](notebooks/00_phase0_validation.ipynb) | Executed Phase 0 EDA reproduction notebook |
@@ -254,7 +254,12 @@ make validate-index
 make export-tableau
 make export-looker
 
-# 6. Optional live BigQuery load into `flight-standby-analytics` (config/standby.yaml; override
+# 6. Free local dbt build on DuckDB (no GCP account): builds all staging/intermediate/mart
+#    models and runs every dbt data test against the dry-run Parquet from step 4 or 5
+make dbt-build-duckdb-sample   # CI sample -> data/processed/sample.duckdb
+make dbt-build-duckdb          # full data (after `make run`) -> data/processed/standby.duckdb
+
+# 7. Optional live BigQuery load into `flight-standby-analytics` (config/standby.yaml; override
 #    with GCP_PROJECT_ID, which dbt reads too): authenticate with
 #    `gcloud auth application-default login`, then load raw and build/test the dbt marts
 #    (bq-load fails fast with BigQueryCredentialsError if no credentials are found;
@@ -262,6 +267,15 @@ make export-looker
 make bq-load
 make dbt-build
 ```
+
+### Local dbt on DuckDB (Free Alternative to BigQuery)
+The same dbt models run on [DuckDB](https://duckdb.org) via the `duckdb` target in [`dbt/profiles.yml`](dbt/profiles.yml) (D-40). Raw sources are read straight from the dry-run Parquet (`data/processed/{sample,full}/*.parquet`), and the marts land in a local `.duckdb` file you can query with Python or the DuckDB CLI:
+
+```bash
+.venv/bin/python -c "import duckdb; print(duckdb.connect('data/processed/standby.duckdb', read_only=True).sql('select year, count(*), avg(soi_historical) from marts.fct_flights group by 1 order by 1'))"
+```
+
+Models stay in BigQuery SQL. [`dbt/macros/cross_db.sql`](dbt/macros/cross_db.sql) registers BigQuery-compatible DuckDB shims (`safe_divide`, `logical_or`, `format_date`, `float64`, ...) and dispatches the constructs whose semantics differ (NULL-propagating `greatest`/`least`, `extract(dayofweek)` numbering, date arithmetic), so BigQuery compiled SQL is unchanged. [`tests/test_dbt_duckdb.py`](tests/test_dbt_duckdb.py) runs `dbt build --target duckdb` on the CI sample and checks `fct_flights` against the Python pipeline column by column.
 
 ### CLI Options for `export-tableau` & `export-looker`
 ```bash
