@@ -224,7 +224,8 @@ make dbt-parse
 make dbt-compile
 make dbt-docs
 
-# 4. Run end-to-end sample dry-run & Tableau sample export (<10s, zero GCP secrets required)
+# 4. Run end-to-end sample dry-run & Tableau sample export (<10s, zero GCP secrets required;
+#    sample extracts go to gitignored data/processed/sample/tableau/, never exports/tableau/)
 make ingest-sample
 make score-sample
 make validate-index-sample
@@ -241,7 +242,9 @@ make export-tableau
 # Default: 100,000-row stratified sample across (year, month, op_carrier), seed=42 (<50 MB Git-safe)
 .venv/bin/python -m standby export-tableau --hub ORD --years 2019,2023-2026
 
-# Recent 12 months slice (or full 830,941-row local extract written to gitignored *_full.csv)
+# Recent 12 months slice (or full 830,941-row local extract written to gitignored exports/tableau/full/)
 .venv/bin/python -m standby export-tableau --flight-mode recent-12m
 .venv/bin/python -m standby export-tableau --flight-mode full
 ```
+
+Switching flight modes in one output directory removes the other mode's flight file only if the previous export there wrote it (it is listed in that directory's `export_metadata.json`); any other file, such as a `fct_flights_tableau_full.csv` left in `exports/tableau/` by an older version, is kept with a warning. Pointing `--output-dir exports/tableau` at a `--sample` or `--flight-mode full` run replaces the committed extracts; restore them with `git checkout -- exports/tableau`.

@@ -45,3 +45,6 @@ Thumbs.db
 
 # Optional full-size (>50 MB) local Tableau flight extracts
 exports/tableau/*_full.csv
+exports/tableau/full/
+# Staging dirs left behind only if an export is killed mid-write
+.export-tmp-*/

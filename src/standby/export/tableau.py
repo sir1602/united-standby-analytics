@@ -5,6 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -250,8 +253,41 @@ _SC5_NULL_REQUIRED_COLS: tuple[str, ...] = (
 )
 
 
+_STAGING_DIR_PREFIX = ".export-tmp-"
+
+
 class ExportValidationError(ValueError):
     """Raised when post-export Tableau invariant checks fail."""
+
+
+def _flight_filename(flight_mode: str) -> str:
+    """Flight extract filename for `flight_mode` (`full` gets a gitignored `_full.csv` suffix)."""
+    return "fct_flights_tableau_full.csv" if flight_mode == "full" else "fct_flights_tableau.csv"
+
+
+def _files_listed_in_metadata(metadata_path: Path) -> set[str]:
+    """File names listed in an existing `export_metadata.json` (empty if missing or unreadable)."""
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    files = payload.get("files") if isinstance(payload, dict) else None
+    return {str(name) for name in files} if isinstance(files, dict) else set()
+
+
+def _resolve_default_output_dir(config: StandbyConfig, flight_mode: str) -> Path:
+    """
+    Default output directory that never overwrites the committed `exports/tableau/` extracts.
+
+    - `--sample` runs write to gitignored `data/processed/sample/tableau/`.
+    - `--flight-mode full` runs write to gitignored `exports/tableau/full/`.
+    - Full-data `stratified` / `recent-12m` runs write to `exports/tableau/` (the committed set).
+    """
+    if config.sample_mode:
+        return config.processed_dir / "sample" / "tableau"
+    if flight_mode == "full":
+        return config.exports_dir / "full"
+    return config.exports_dir
 
 
 @dataclass(frozen=True)
@@ -842,12 +878,12 @@ def _stratified_sample_flights(
     Uses Hamilton largest-remainder allocation so total sampled rows equals `max_rows`
     exactly whenever `len(df) > max_rows`.
     """
+    if max_rows <= 0:
+        raise ValueError(f"max_rows must be positive, got {max_rows}")
     if len(df) <= max_rows:
         return df.sort_values(
             ["flight_date", "crs_dep_time", "flight_id"], kind="mergesort"
         ).reset_index(drop=True)
-    if max_rows <= 0:
-        raise ValueError(f"max_rows must be positive, got {max_rows}")
 
     work = df.sort_values(["year", "month", "op_carrier", "flight_id"], kind="mergesort").copy()
     strata_cols = ["year", "month", "op_carrier"]
@@ -928,7 +964,7 @@ def _select_flights_for_export(
             .tail(12)
         )
         recent = work.merge(ym_pairs, on=["year", "month"], how="inner")
-        if max_flight_rows > 0 and len(recent) > max_flight_rows:
+        if len(recent) > max_flight_rows:
             return _stratified_sample_flights(recent, max_rows=max_flight_rows, seed=stratify_seed)
         return recent.sort_values(
             ["flight_date", "crs_dep_time", "flight_id"], kind="mergesort"
@@ -1377,6 +1413,10 @@ def export_tableau_extracts(
         if max_flight_rows is not None
         else int(config.export.tableau_flight_max_rows)
     )
+    if resolved_mode != "full" and resolved_max_rows < 1:
+        raise ValueError(
+            f"max_flight_rows must be >= 1 for flight_mode {resolved_mode!r}, got {resolved_max_rows}"
+        )
     resolved_seed = (
         int(stratify_seed)
         if stratify_seed is not None
@@ -1387,7 +1427,7 @@ def export_tableau_extracts(
         if float_precision is not None
         else int(config.export.tableau_float_precision)
     )
-    resolved_out_dir = (output_dir or config.exports_dir).resolve()
+    resolved_out_dir = (output_dir or _resolve_default_output_dir(config, resolved_mode)).resolve()
     resolved_out_dir.mkdir(parents=True, exist_ok=True)
 
     flights_raw, t100_df, lookups_df, tsa_df = _load_source_tables_for_export(
@@ -1476,9 +1516,7 @@ def export_tableau_extracts(
         val_json = report.to_dict()
     validation_summary_df = _build_validation_summary_df(val_json)
 
-    flight_filename = (
-        "fct_flights_tableau_full.csv" if resolved_mode == "full" else "fct_flights_tableau.csv"
-    )
+    flight_filename = _flight_filename(resolved_mode)
     output_frames: dict[str, pd.DataFrame] = {
         "agg_route_month.csv": _round_float_columns(agg_route_month, resolved_precision),
         "dim_airport.csv": dim_airport,
@@ -1490,66 +1528,109 @@ def export_tableau_extracts(
         "validation_summary.csv": _round_float_columns(validation_summary_df, resolved_precision),
     }
 
-    written_paths: dict[str, Path] = {}
-    for fname, df in output_frames.items():
-        fpath = resolved_out_dir / fname
-        df.to_csv(fpath, index=False, encoding="utf-8")
-        written_paths[fname] = fpath
-
-    validation_tables = {
-        "agg_route_month.csv": output_frames["agg_route_month.csv"],
-        "dim_airport.csv": output_frames["dim_airport.csv"],
-        "dim_aircraft.csv": output_frames["dim_aircraft.csv"],
-        "dim_carrier.csv": output_frames["dim_carrier.csv"],
-        "dim_date.csv": output_frames["dim_date.csv"],
-        "fct_flights": output_frames[flight_filename],
-        "route_map_paths.csv": output_frames["route_map_paths.csv"],
-        "validation_summary.csv": output_frames["validation_summary.csv"],
-    }
-    _validate_exported_tables(
-        tables=validation_tables,
-        file_paths=written_paths,
-        flight_mode=resolved_mode,
-        max_file_mb=float(config.export.tableau_max_file_mb),
-    )
-
-    files_meta: dict[str, ExportedFileInfo] = {}
-    files_json: dict[str, dict[str, Any]] = {}
-    for fname, fpath in written_paths.items():
-        df = output_frames[fname]
-        size_bytes = int(fpath.stat().st_size)
-        sha = _sha256_file(fpath)
-        files_meta[fname] = ExportedFileInfo(
-            filename=fname,
-            path=fpath,
-            rows=int(len(df)),
-            columns=int(len(df.columns)),
-            bytes=size_bytes,
-            sha256=sha,
-        )
-        files_json[fname] = {
-            "rows": int(len(df)),
-            "columns": int(len(df.columns)),
-            "bytes": size_bytes,
-            "sha256": sha,
-        }
-
-    metadata_payload = {
-        "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "hub": config.active_hub,
-        "years": config.years,
-        "sample_mode": config.sample_mode,
-        "flight_mode": resolved_mode,
-        "flight_row_budget": resolved_max_rows if resolved_mode != "full" else total_source_flights,
-        "stratify_seed": resolved_seed,
-        "float_precision": resolved_precision,
-        "total_source_flights": total_source_flights,
-        "exported_flights": int(len(fct_flights_tableau)),
-        "invariants_passed": True,
-        "files": files_json,
-    }
+    # Stage every file in a scratch directory next to the output (same filesystem, so
+    # `os.replace` is atomic per file) and only publish once all invariants pass. A failed
+    # export therefore leaves the existing extracts and `export_metadata.json` untouched.
     metadata_path = resolved_out_dir / "export_metadata.json"
-    metadata_path.write_text(json.dumps(metadata_payload, indent=2) + "\n", encoding="utf-8")
+    staging_dir = Path(tempfile.mkdtemp(prefix=_STAGING_DIR_PREFIX, dir=resolved_out_dir))
+    try:
+        staged_paths: dict[str, Path] = {}
+        for fname, df in output_frames.items():
+            fpath = staging_dir / fname
+            df.to_csv(fpath, index=False, encoding="utf-8")
+            staged_paths[fname] = fpath
+
+        validation_tables = {
+            "agg_route_month.csv": output_frames["agg_route_month.csv"],
+            "dim_airport.csv": output_frames["dim_airport.csv"],
+            "dim_aircraft.csv": output_frames["dim_aircraft.csv"],
+            "dim_carrier.csv": output_frames["dim_carrier.csv"],
+            "dim_date.csv": output_frames["dim_date.csv"],
+            "fct_flights": output_frames[flight_filename],
+            "route_map_paths.csv": output_frames["route_map_paths.csv"],
+            "validation_summary.csv": output_frames["validation_summary.csv"],
+        }
+        _validate_exported_tables(
+            tables=validation_tables,
+            file_paths=staged_paths,
+            flight_mode=resolved_mode,
+            max_file_mb=float(config.export.tableau_max_file_mb),
+        )
+
+        files_meta: dict[str, ExportedFileInfo] = {}
+        files_json: dict[str, dict[str, Any]] = {}
+        for fname, fpath in staged_paths.items():
+            df = output_frames[fname]
+            size_bytes = int(fpath.stat().st_size)
+            sha = _sha256_file(fpath)
+            files_meta[fname] = ExportedFileInfo(
+                filename=fname,
+                path=resolved_out_dir / fname,
+                rows=int(len(df)),
+                columns=int(len(df.columns)),
+                bytes=size_bytes,
+                sha256=sha,
+            )
+            files_json[fname] = {
+                "rows": int(len(df)),
+                "columns": int(len(df.columns)),
+                "bytes": size_bytes,
+                "sha256": sha,
+            }
+
+        metadata_payload = {
+            "generated_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "hub": config.active_hub,
+            "years": config.years,
+            "sample_mode": config.sample_mode,
+            "flight_mode": resolved_mode,
+            "flight_row_budget": (
+                resolved_max_rows if resolved_mode != "full" else total_source_flights
+            ),
+            "stratify_seed": resolved_seed,
+            "float_precision": resolved_precision,
+            "total_source_flights": total_source_flights,
+            "exported_flights": int(len(fct_flights_tableau)),
+            "invariants_passed": True,
+            "files": files_json,
+        }
+        staged_metadata = staging_dir / "export_metadata.json"
+        staged_metadata.write_text(json.dumps(metadata_payload, indent=2) + "\n", encoding="utf-8")
+
+        # Publish: note which files the previous export here wrote, drop the old metadata so an
+        # interrupted publish never leaves metadata vouching for files it no longer matches,
+        # then move CSVs, then write metadata last.
+        previous_files = _files_listed_in_metadata(metadata_path)
+        metadata_path.unlink(missing_ok=True)
+        for fname, fpath in staged_paths.items():
+            os.replace(fpath, resolved_out_dir / fname)
+
+        # The other mode's flight extract is not described by the new metadata. Remove it only
+        # when the previous export in this directory wrote it (listed in its metadata); keep any
+        # file the exporter cannot vouch for, such as a `_full.csv` left by an older version.
+        other_mode = "stratified" if resolved_mode == "full" else "full"
+        stale_flight_path = resolved_out_dir / _flight_filename(other_mode)
+        if stale_flight_path.exists():
+            if stale_flight_path.name in previous_files:
+                logger.warning(
+                    "Removing %s written by the previous export in %s (not part of this %s-mode "
+                    "export)",
+                    stale_flight_path.name,
+                    resolved_out_dir,
+                    resolved_mode,
+                )
+                stale_flight_path.unlink()
+            else:
+                logger.warning(
+                    "Keeping %s in %s: the previous export_metadata.json does not list it, so it "
+                    "was not written by the last export here; it is not part of this export",
+                    stale_flight_path.name,
+                    resolved_out_dir,
+                )
+
+        os.replace(staged_metadata, metadata_path)
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
 
     return TableauExportResult(
         output_dir=resolved_out_dir,

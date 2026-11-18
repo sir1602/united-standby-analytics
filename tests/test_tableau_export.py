@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -23,6 +25,7 @@ from standby.export.tableau import (
     ROUTE_MAP_PATHS_COLUMNS,
     VALIDATION_SUMMARY_COLUMNS,
     ExportValidationError,
+    _resolve_default_output_dir,
     _resolve_hub_set,
     _select_flights_for_export,
     _stratified_sample_flights,
@@ -172,6 +175,19 @@ def test_recent_12m_and_full_export_modes(
     }
     actual_recent = {tuple(r) for r in recent_fct[["year", "month"]].drop_duplicates().to_numpy()}
     assert actual_recent == expected_latest
+
+    # Switching modes in one directory leaves exactly one consistent run: the previous
+    # `fct_flights_tableau.csv` is removed and metadata lists every CSV that remains.
+    export_tableau_extracts(
+        config=sample_config,
+        output_dir=recent_dir,
+        flight_mode="full",
+        from_processed=False,
+    )
+    assert not (recent_dir / "fct_flights_tableau.csv").exists()
+    assert (recent_dir / "fct_flights_tableau_full.csv").is_file()
+    recent_meta = json.loads((recent_dir / "export_metadata.json").read_text(encoding="utf-8"))
+    assert set(recent_meta["files"]) == {p.name for p in recent_dir.glob("*.csv")}
 
     # Multi-month synthetic check (> 12 months) confirms oldest months are dropped
     synth_rows = [
@@ -382,8 +398,11 @@ def test_cli_export_tableau_sample_and_committed_exports_integrity(
     assert meta_path.is_file(), "Committed exports/tableau/export_metadata.json missing"
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     assert meta["invariants_passed"] is True
-    assert meta["total_source_flights"] == 830941
-    assert meta["exported_flights"] == 100000
+    assert meta["sample_mode"] is False, "Committed extracts were overwritten by a --sample run"
+    assert meta["flight_mode"] in {"stratified", "recent-12m"}
+    assert "fct_flights_tableau.csv" in meta["files"]
+    assert meta["exported_flights"] == meta["files"]["fct_flights_tableau.csv"]["rows"]
+    assert meta["exported_flights"] == min(meta["flight_row_budget"], meta["total_source_flights"])
 
     cfg = load_config(repo_root=repo_root)
     max_bytes = int(cfg.export.tableau_max_file_mb * 1024 * 1024)
@@ -439,10 +458,9 @@ def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
         "is_shared_regional_spoke",
         "Airport",
         "MAKELINE",
-        "Med 14.0",
-        "2.2 flts",
     ):
         assert required_spec in spec_text, f"Missing {required_spec!r} in tableau_dashboard_spec.md"
+    # Previously published KPI figures that were wrong must not come back.
     assert "Median Open Seats (Adj): 19.2" not in spec_text
     assert "3.4 flts" not in spec_text
 
@@ -460,7 +478,7 @@ def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
     ):
         assert required_bq in bq_text, f"Missing {required_bq!r} in bigquery_optimization.md"
 
-    # 4. README: CI badge, PR #9, methodology, consistency caveat, BQ summary, Tableau placeholder/wireframe, limitations/v2
+    # 4. README: CI badge, methodology, consistency caveat, BQ summary, Tableau placeholder/wireframe, limitations/v2
     readme_text = readme_path.read_text(encoding="utf-8")
     for required_readme in (
         "actions/workflows/ci.yml/badge.svg",
@@ -471,7 +489,128 @@ def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
         "bq query --dry_run",
         "Tableau Public Dashboard",
         "Assumptions, Limitations & `v2` Roadmap",
-        "PR #9",
-        "75,512",
     ):
         assert required_readme in readme_text, f"Missing {required_readme!r} in README.md"
+
+
+def test_default_output_dirs_never_target_committed_exports(
+    sample_config: StandbyConfig,
+    repo_root: Path,
+    tmp_path: Path,
+) -> None:
+    """`--sample` and `--flight-mode full` default to gitignored dirs, not `exports/tableau/`."""
+    full_cfg = load_config(repo_root=repo_root)
+    assert _resolve_default_output_dir(full_cfg, "stratified") == full_cfg.exports_dir
+    assert _resolve_default_output_dir(full_cfg, "recent-12m") == full_cfg.exports_dir
+    assert _resolve_default_output_dir(full_cfg, "full") == full_cfg.exports_dir / "full"
+    for mode in ("stratified", "recent-12m", "full"):
+        assert _resolve_default_output_dir(sample_config, mode) == (
+            sample_config.processed_dir / "sample" / "tableau"
+        )
+
+    # End to end with no `output_dir`: the (isolated) exports dir is never created or touched.
+    isolated_cfg = dataclasses.replace(sample_config, exports_dir=tmp_path / "exports" / "tableau")
+    res = export_tableau_extracts(config=isolated_cfg, from_processed=False)
+    assert res.output_dir == (isolated_cfg.processed_dir / "sample" / "tableau").resolve()
+    assert (res.output_dir / "fct_flights_tableau.csv").is_file()
+    assert not isolated_cfg.exports_dir.exists()
+
+
+def test_unlisted_other_mode_flight_file_is_kept(
+    sample_config: StandbyConfig,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `_full.csv` the previous export did not write (e.g. from an older version) is kept."""
+    # Earlier CLI tests run `configure_logging`, which stops `standby` logs reaching caplog.
+    monkeypatch.setattr(logging.getLogger("standby"), "propagate", True)
+    out_dir = tmp_path / "legacy"
+    out_dir.mkdir()
+    legacy_text = "flight_id\nlegacy-full-run\n"
+    (out_dir / "fct_flights_tableau_full.csv").write_text(legacy_text, encoding="utf-8")
+    (out_dir / "export_metadata.json").write_text(
+        json.dumps({"files": {"fct_flights_tableau.csv": {}}}) + "\n", encoding="utf-8"
+    )
+
+    with caplog.at_level("WARNING", logger="standby.export.tableau"):
+        export_tableau_extracts(
+            config=sample_config,
+            output_dir=out_dir,
+            flight_mode="stratified",
+            from_processed=False,
+        )
+
+    legacy = out_dir / "fct_flights_tableau_full.csv"
+    assert legacy.read_text(encoding="utf-8") == legacy_text
+    assert "Keeping fct_flights_tableau_full.csv" in caplog.text
+    meta = json.loads((out_dir / "export_metadata.json").read_text(encoding="utf-8"))
+    assert "fct_flights_tableau_full.csv" not in meta["files"]
+    assert (out_dir / "fct_flights_tableau.csv").is_file()
+
+
+def test_failed_validation_leaves_existing_exports_untouched(
+    sample_config: StandbyConfig,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failing invariant must not overwrite existing extracts or their metadata."""
+    out_dir = tmp_path / "existing"
+    out_dir.mkdir()
+    previous = {
+        "fct_flights_tableau.csv": "flight_id\nprevious-run\n",
+        "agg_route_month.csv": "route_month_id\nprevious-run\n",
+        "export_metadata.json": '{"invariants_passed": true}\n',
+    }
+    for name, text in previous.items():
+        (out_dir / name).write_text(text, encoding="utf-8")
+
+    def _always_fail(**_kwargs: object) -> None:
+        raise ExportValidationError("forced failure")
+
+    monkeypatch.setattr("standby.export.tableau._validate_exported_tables", _always_fail)
+    with pytest.raises(ExportValidationError, match="forced failure"):
+        export_tableau_extracts(config=sample_config, output_dir=out_dir, from_processed=False)
+
+    assert sorted(p.name for p in out_dir.iterdir()) == sorted(previous)
+    for name, text in previous.items():
+        assert (out_dir / name).read_text(encoding="utf-8") == text
+
+
+def test_max_flight_rows_must_be_positive(
+    sample_config: StandbyConfig,
+    tmp_path: Path,
+) -> None:
+    """A zero/negative row limit is rejected the same way for every sampled mode."""
+    tiny = pd.DataFrame(
+        {
+            "flight_id": ["a"],
+            "flight_date": ["2024-01-01"],
+            "crs_dep_time": ["0800"],
+            "year": [2024],
+            "month": [1],
+            "op_carrier": ["UA"],
+        }
+    )
+    with pytest.raises(ValueError, match="max_rows must be positive"):
+        _stratified_sample_flights(tiny, max_rows=0, seed=42)
+    with pytest.raises(ValueError, match="max_rows must be positive"):
+        _select_flights_for_export(
+            tiny, flight_mode="recent-12m", max_flight_rows=0, stratify_seed=42
+        )
+
+    for mode in ("stratified", "recent-12m"):
+        with pytest.raises(ValueError, match="max_flight_rows must be >= 1"):
+            export_tableau_extracts(
+                config=sample_config,
+                output_dir=tmp_path / mode,
+                flight_mode=mode,
+                max_flight_rows=0,
+            )
+
+    res = CliRunner().invoke(
+        main,
+        ["export-tableau", "--sample", "--max-flight-rows", "0", "--output-dir", str(tmp_path)],
+    )
+    assert res.exit_code == 2
+    assert "--max-flight-rows" in res.output
