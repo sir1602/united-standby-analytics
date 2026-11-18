@@ -59,10 +59,27 @@ models:
     marts:
       +materialized: table
       +schema: marts
+    # Looker Studio reporting layer (docs/looker_studio_dashboard_spec.md, Option B)
+    looker:
+      +materialized: table
+      +schema: looker
+      # BigQuery-only: Looker Studio reads BigQuery, so the DuckDB target skips this layer.
+      +enabled: "{{ target.type == 'bigquery' }}"
 
 seeds:
   united_standby_analytics:
     +schema: raw
+    lk_validation_summary:
+      +schema: looker
+      +enabled: "{{ target.type == 'bigquery' }}"
+      +column_types:
+        pillar: string
+        metric_group: string
+        metric_name: string
+        metric_value: float64
+        sample_n: int64
+        status_or_gate: string
+        notes: string
     seat_config:
       +column_types:
         subtype: string
