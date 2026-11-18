@@ -61,29 +61,104 @@ This document specifies the Google Cloud BigQuery warehouse architecture for `un
 
 ---
 
-## 5. Partition- & Cluster-Pruning Query Examples
+## 5. Unpartitioned vs. Partition-Filtered Benchmark SQL & `bq query --dry_run`
 
-### 5.1 Prospective Route Planning Query (Prunes by `flight_date` Partition + `origin, dest` Cluster)
+> **Transparency Note:** No GCP project or service-account credentials are attached to this repository's offline CI environment (`DISPATCH.md`). Accordingly, **zero live `totalBytesProcessed` byte counts are fabricated below**. Once you authenticate `gcloud auth login` against your billing-enabled GCP project (`united-standby-analytics`), run the exact benchmark SQL pair and `bq query --dry_run` commands below to capture live byte-scan metrics.
+
+### 5.1 Benchmark SQL Pair (Same Output, Unpartitioned / Non-Pruned vs. Partition-Pruned + Clustered)
+
+#### Query A1 — Unpartitioned Baseline Table (Full Table Scan Anti-Pattern)
+Create an unpartitioned, unclustered baseline copy (optional benchmark fixture) and scan all `830,941` rows across all `1,704` dates:
 ```sql
+-- Optional unpartitioned baseline fixture (for 1:1 storage/scan comparison)
+CREATE OR REPLACE TABLE `united-standby-analytics.marts._bench_fct_flights_unpartitioned` AS
+SELECT * FROM `united-standby-analytics.marts.fct_flights`;
+
+-- Query A1: Scans 100% of _bench_fct_flights_unpartitioned (no partition or cluster pruning)
 SELECT
     flight_date,
     crs_dep_time,
-    hour_block,
     op_carrier,
     fleet_subtype,
-    seats_config,
     est_open_seats_adjusted,
-    remaining_scheduled_backups,
     ROUND(soi_planning, 2) AS soi_planning
-FROM `united-standby-analytics.marts.fct_flights`
-WHERE flight_date BETWEEN DATE '2026-07-01' AND DATE '2026-07-07'
+FROM `united-standby-analytics.marts._bench_fct_flights_unpartitioned`
+WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
   AND origin = 'ORD'
   AND dest = 'DEN'
-  AND soi_planning IS NOT NULL
-ORDER BY flight_date, soi_planning DESC;
+  AND op_carrier = 'UA';
 ```
 
-### 5.2 Post-Hoc Thanksgiving Sunday Audit (Year-Anchored Holiday Window + Completed Flights)
+#### Query A2 — Non-Prunable Partition Expression Anti-Pattern on `marts.fct_flights`
+Wrapping `flight_date` in `FORMAT_DATE(...)` prevents BigQuery partition elimination on `marts.fct_flights`, forcing a full scan across all `1,704` daily partitions:
+```sql
+-- Query A2: Non-prunable predicate prevents partition elimination on marts.fct_flights
+SELECT
+    flight_date,
+    crs_dep_time,
+    op_carrier,
+    fleet_subtype,
+    est_open_seats_adjusted,
+    ROUND(soi_planning, 2) AS soi_planning
+FROM `united-standby-analytics.marts.fct_flights`
+WHERE FORMAT_DATE('%Y-%m', flight_date) = '2025-07'
+  AND origin = 'ORD'
+  AND dest = 'DEN'
+  AND op_carrier = 'UA';
+```
+
+#### Query B — Partition-Pruned + Clustered Query on `marts.fct_flights` (Recommended)
+Direct `DATE` predicate on `flight_date` eliminates `1,673` of `1,704` partitions (`31 / 1,704 ≈ 1.82%` of partitions retained), and `origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'` aligns directly with `CLUSTER BY origin, dest, op_carrier`:
+```sql
+-- Query B: Partition-pruned (31 / 1,704 days) + clustered block pruning on (origin, dest, op_carrier)
+SELECT
+    flight_date,
+    crs_dep_time,
+    op_carrier,
+    fleet_subtype,
+    est_open_seats_adjusted,
+    ROUND(soi_planning, 2) AS soi_planning
+FROM `united-standby-analytics.marts.fct_flights`
+WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
+  AND origin = 'ORD'
+  AND dest = 'DEN'
+  AND op_carrier = 'UA';
+```
+
+### 5.2 Reproducible `bq query --dry_run` CLI Verification Commands
+
+Run both dry-run commands from a shell authenticated to your GCP project (`$0.00` cost — `--dry_run` estimates `.statistics.totalBytesProcessed` without executing or billing):
+
+```bash
+# 1. Baseline A1 (if _bench_fct_flights_unpartitioned exists) or A2 (non-prunable FORMAT_DATE on fct_flights)
+bq query --use_legacy_sql=false --dry_run --format=prettyjson \
+  "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
+   FROM \`united-standby-analytics.marts._bench_fct_flights_unpartitioned\`
+   WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
+     AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
+  | jq -r '.statistics.totalBytesProcessed'
+
+bq query --use_legacy_sql=false --dry_run --format=prettyjson \
+  "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
+   FROM \`united-standby-analytics.marts.fct_flights\`
+   WHERE FORMAT_DATE('%Y-%m', flight_date) = '2025-07'
+     AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
+  | jq -r '.statistics.totalBytesProcessed'
+
+# 2. Partition-pruned + clustered Query B on marts.fct_flights
+bq query --use_legacy_sql=false --dry_run --format=prettyjson \
+  "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
+   FROM \`united-standby-analytics.marts.fct_flights\`
+   WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
+     AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
+  | jq -r '.statistics.totalBytesProcessed'
+```
+
+- **Expected Structural Reduction:** Query B scans only the `31` daily partitions (`2025-07-01..2025-07-31`) out of `1,704` total partitions (`~98.2%` partition elimination before cluster block pruning on `(origin, dest, op_carrier)`), whereas A1 and A2 must scan all `1,704` days (`830,941` rows) for the selected 6 columns. *(Live `totalBytesProcessed` values must be captured on your GCP project; none are fabricated here.)*
+
+### 5.3 Additional Production Query Patterns
+
+#### Post-Hoc Thanksgiving Sunday Audit (Year-Anchored Holiday Window + Completed Flights)
 ```sql
 SELECT
     f.flight_date,
@@ -104,7 +179,7 @@ ORDER BY f.soi_historical ASC
 LIMIT 50;
 ```
 
-### 5.3 International Route-Month Lookup (`v1` Route-Month Grain)
+#### International Route-Month Lookup (`v1` Route-Month Grain)
 ```sql
 SELECT
     year,

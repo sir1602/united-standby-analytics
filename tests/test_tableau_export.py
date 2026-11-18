@@ -23,6 +23,8 @@ from standby.export.tableau import (
     ROUTE_MAP_PATHS_COLUMNS,
     VALIDATION_SUMMARY_COLUMNS,
     ExportValidationError,
+    _resolve_hub_set,
+    _select_flights_for_export,
     _stratified_sample_flights,
     _validate_exported_tables,
     export_tableau_extracts,
@@ -137,7 +139,7 @@ def test_recent_12m_and_full_export_modes(
     sample_config: StandbyConfig,
     tmp_path: Path,
 ) -> None:
-    """`recent-12m` filters to latest 12 year-months and `full` writes `*_full.csv`."""
+    """`recent-12m` filters strictly to latest 12 year-months and `full` writes `*_full.csv`."""
     recent_dir = tmp_path / "recent"
     res_recent = export_tableau_extracts(
         config=sample_config,
@@ -147,7 +149,6 @@ def test_recent_12m_and_full_export_modes(
     )
     assert res_recent.flight_mode == "recent-12m"
     recent_fct = pd.read_csv(recent_dir / "fct_flights_tableau.csv")
-    assert recent_fct[["year", "month"]].drop_duplicates().shape[0] <= 12
 
     full_dir = tmp_path / "full"
     res_full = export_tableau_extracts(
@@ -160,12 +161,59 @@ def test_recent_12m_and_full_export_modes(
     assert (full_dir / "fct_flights_tableau_full.csv").is_file()
     assert res_full.exported_flights == res_full.total_source_flights == 80
 
+    full_fct = pd.read_csv(full_dir / "fct_flights_tableau_full.csv")
+    expected_latest = {
+        tuple(r)
+        for r in full_fct[["year", "month"]]
+        .drop_duplicates()
+        .sort_values(["year", "month"])
+        .tail(12)
+        .to_numpy()
+    }
+    actual_recent = {tuple(r) for r in recent_fct[["year", "month"]].drop_duplicates().to_numpy()}
+    assert actual_recent == expected_latest
+
+    # Multi-month synthetic check (> 12 months) confirms oldest months are dropped
+    synth_rows = [
+        {
+            "flight_id": f"2024{m:02d}01|UA|{i}|ORD|DEN|0800",
+            "flight_date": f"{2023 + (m - 1) // 12}-{(m - 1) % 12 + 1:02d}-01",
+            "crs_dep_time": "0800",
+            "year": 2023 + (m - 1) // 12,
+            "month": (m - 1) % 12 + 1,
+        }
+        for i, m in enumerate(range(1, 16), start=1)
+    ]
+    selected = _select_flights_for_export(
+        pd.DataFrame(synth_rows),
+        flight_mode="recent-12m",
+        max_flight_rows=100,
+        stratify_seed=42,
+    )
+    ym_selected = sorted({(int(r.year), int(r.month)) for r in selected.itertuples()})
+    assert len(ym_selected) == 12
+    assert ym_selected[0] == (2023, 4)
+    assert ym_selected[-1] == (2024, 3)
+
+
+def test_resolve_hub_set_respects_active_hub_override(repo_root: Path) -> None:
+    """`--hub` override (`config.active_hub`) takes precedence over `config/standby.yaml` hubs."""
+    cfg_default = load_config(repo_root=repo_root)
+    assert _resolve_hub_set(cfg_default) == {"ORD"}
+
+    cfg_den = load_config(repo_root=repo_root, hub="DEN")
+    assert cfg_den.active_hub == "DEN"
+    assert _resolve_hub_set(cfg_den) == {"DEN"}
+
 
 def test_post_export_validation_catches_sc5_pii_pk_and_size(tmp_path: Path) -> None:
-    """Post-export invariant validator rejects SC-5 leakage, PII, duplicate PK, bounds, and oversized CSVs."""
+    """Post-export invariant validator rejects SC-5, PII, PK, bounds, intl OTP, null rules, self-loops, and oversized CSVs."""
     base_fct = pd.DataFrame(
         {
             "flight_id": ["20240101|UA|1|ORD|DEN|0800", "20240101|UA|2|ORD|EWR|0900"],
+            "year": [2024, 2019],
+            "is_cancelled": [False, False],
+            "seats_config": [166, 166],
             "t100_available": [True, False],
             "lf_source": ["CARRIER_ROUTE_MONTH_TYPE", "UNMATCHED"],
             "est_load_factor": [0.80, np.nan],
@@ -188,10 +236,10 @@ def test_post_export_validation_catches_sc5_pii_pk_and_size(tmp_path: Path) -> N
     )
     base_agg = pd.DataFrame(
         {
-            "route_month_id": ["2024-01|UA|ORD|DEN|DOM"],
-            "is_international": [False],
-            "t100_load_factor": [0.80],
-            "otp_scheduled_flights": [100],
+            "route_month_id": ["2024-01|UA|ORD|DEN|DOM", "2024-01|UA|ORD|LHR|INTL"],
+            "is_international": [False, True],
+            "t100_load_factor": [0.80, 0.85],
+            "otp_scheduled_flights": pd.array([100, pd.NA], dtype="Int64"),
         }
     )
     valid_tables = {
@@ -201,7 +249,14 @@ def test_post_export_validation_catches_sc5_pii_pk_and_size(tmp_path: Path) -> N
         "dim_carrier.csv": pd.DataFrame({"op_carrier": ["UA"]}),
         "dim_date.csv": pd.DataFrame({"date_day": ["2024-01-01"]}),
         "fct_flights": base_fct,
-        "route_map_paths.csv": pd.DataFrame({"path_id": ["ORD-DEN-DOM"], "path_order": [1]}),
+        "route_map_paths.csv": pd.DataFrame(
+            {
+                "path_id": ["ORD-DEN-DOM", "ORD-DEN-DOM"],
+                "origin": ["ORD", "ORD"],
+                "dest": ["DEN", "DEN"],
+                "path_order": [1, 2],
+            }
+        ),
         "validation_summary.csv": pd.DataFrame({"pillar": ["P1"]}),
     }
     dummy_paths = {}
@@ -246,7 +301,50 @@ def test_post_export_validation_catches_sc5_pii_pk_and_size(tmp_path: Path) -> N
             bad_bounds, dummy_paths, flight_mode="stratified", max_file_mb=50.0
         )
 
-    # 5. File size cap
+    # 5. International non-null otp_* rejection
+    bad_intl = {**valid_tables, "agg_route_month.csv": base_agg.copy()}
+    bad_intl["agg_route_month.csv"].loc[1, "otp_scheduled_flights"] = 25
+    with pytest.raises(ExportValidationError, match="International rows"):
+        _validate_exported_tables(bad_intl, dummy_paths, flight_mode="stratified", max_file_mb=50.0)
+
+    # 6. est_passengers > seats_config rejection
+    bad_seats = {**valid_tables, "fct_flights": base_fct.copy()}
+    bad_seats["fct_flights"].loc[0, "est_passengers"] = 180
+    with pytest.raises(ExportValidationError, match="exceeds seats_config"):
+        _validate_exported_tables(
+            bad_seats, dummy_paths, flight_mode="stratified", max_file_mb=50.0
+        )
+
+    # 7. 2019 soi_planning non-null rejection
+    bad_2019 = {**valid_tables, "fct_flights": base_fct.copy()}
+    bad_2019["fct_flights"].loc[1, "t100_available"] = True
+    bad_2019["fct_flights"].loc[1, "lf_source"] = "CARRIER_ROUTE_MONTH"
+    bad_2019["fct_flights"].loc[1, "soi_planning"] = 50.0
+    with pytest.raises(ExportValidationError, match="2019 rows must have NULL soi_planning"):
+        _validate_exported_tables(bad_2019, dummy_paths, flight_mode="stratified", max_file_mb=50.0)
+
+    # 8. Cancelled soi_historical non-null rejection
+    bad_canc = {**valid_tables, "fct_flights": base_fct.copy()}
+    bad_canc["fct_flights"].loc[0, "is_cancelled"] = True
+    with pytest.raises(ExportValidationError, match="cancelled rows must have NULL soi_historical"):
+        _validate_exported_tables(bad_canc, dummy_paths, flight_mode="stratified", max_file_mb=50.0)
+
+    # 9. route_map_paths self-loop rejection
+    bad_loop = {
+        **valid_tables,
+        "route_map_paths.csv": pd.DataFrame(
+            {
+                "path_id": ["ORD-ORD-DOM"],
+                "origin": ["ORD"],
+                "dest": ["ORD"],
+                "path_order": [1],
+            }
+        ),
+    }
+    with pytest.raises(ExportValidationError, match="self-loop"):
+        _validate_exported_tables(bad_loop, dummy_paths, flight_mode="stratified", max_file_mb=50.0)
+
+    # 10. File size cap
     with pytest.raises(ExportValidationError, match="exceeds"):
         _validate_exported_tables(
             valid_tables, dummy_paths, flight_mode="stratified", max_file_mb=0.000001
@@ -300,13 +398,15 @@ def test_cli_export_tableau_sample_and_committed_exports_integrity(
 
 
 def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
-    """Phase 5 documentation deliverables exist and document all 157 BigQuery mart columns."""
+    """Phase 5 documentation deliverables cover 157 mart columns, Tableau specs, BigQuery dry-run SQL, and README contracts."""
     dd_path = repo_root / "docs" / "data_dictionary.md"
     spec_path = repo_root / "docs" / "tableau_dashboard_spec.md"
     bq_path = repo_root / "docs" / "bigquery_optimization.md"
-    for p in (dd_path, spec_path, bq_path):
+    readme_path = repo_root / "README.md"
+    for p in (dd_path, spec_path, bq_path, readme_path):
         assert p.is_file() and p.stat().st_size > 1000
 
+    # 1. Data dictionary: 157 columns, all 6 marts, consistent tsa_ratio_year tier
     dd_text = dd_path.read_text(encoding="utf-8")
     assert "157" in dd_text
     for table_name in (
@@ -318,14 +418,60 @@ def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
         "marts.dim_date",
     ):
         assert table_name in dd_text
+    assert "| 14 | `tsa_ratio_year` | `FLOAT64` | `estimated` |" in dd_text
 
+    # 2. Tableau dashboard spec: 4 disclaimers, KPI formulas, 2019 baseline, flight detail table, grounded numbers
     spec_text = spec_path.read_text(encoding="utf-8")
-    assert "NOT a Boarding Probability" in spec_text
-    assert "not affiliated with" in spec_text.lower()
-    assert "route_month_only_v1" in spec_text
-    assert "Airport" in spec_text
+    for required_spec in (
+        "NOT a Boarding Probability",
+        "not affiliated with",
+        "NOT from observed flight-level loads",
+        "route_month_only_v1",
+        "KPI Load Factor (Adj)",
+        "KPI Delay Rate (Dep 15+)",
+        "KPI Cancellation Rate",
+        "KPI Avg Open Seats (Adj)",
+        "SOI 2019 Baseline (Historical)",
+        "SOI vs 2019 Baseline Delta",
+        "confidence_tier",
+        "record_confidence_summary",
+        "lf_source",
+        "is_shared_regional_spoke",
+        "Airport",
+        "MAKELINE",
+        "Med 14.0",
+        "2.2 flts",
+    ):
+        assert required_spec in spec_text, f"Missing {required_spec!r} in tableau_dashboard_spec.md"
+    assert "Median Open Seats (Adj): 19.2" not in spec_text
+    assert "3.4 flts" not in spec_text
 
+    # 3. BigQuery optimization: Sandbox rationale, unpartitioned vs pruned SQL, bq query --dry_run, zero fake bytes
     bq_text = bq_path.read_text(encoding="utf-8")
-    assert "Sandbox" in bq_text
-    assert "flight_date" in bq_text
-    assert "origin, dest, op_carrier" in bq_text
+    for required_bq in (
+        "Sandbox",
+        "flight_date",
+        "origin, dest, op_carrier",
+        "_bench_fct_flights_unpartitioned",
+        "FORMAT_DATE",
+        "BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'",
+        "bq query --use_legacy_sql=false --dry_run --format=prettyjson",
+        "totalBytesProcessed",
+    ):
+        assert required_bq in bq_text, f"Missing {required_bq!r} in bigquery_optimization.md"
+
+    # 4. README: CI badge, PR #9, methodology, consistency caveat, BQ summary, Tableau placeholder/wireframe, limitations/v2
+    readme_text = readme_path.read_text(encoding="utf-8")
+    for required_readme in (
+        "actions/workflows/ci.yml/badge.svg",
+        "Data Sources & Acquisition",
+        "Standby Opportunity Index Formula",
+        "Consistency vs. Ground Truth Caveat",
+        "BigQuery Architecture & Partitioning Optimization",
+        "bq query --dry_run",
+        "Tableau Public Dashboard",
+        "Assumptions, Limitations & `v2` Roadmap",
+        "PR #9",
+        "75,512",
+    ):
+        assert required_readme in readme_text, f"Missing {required_readme!r} in README.md"

@@ -336,6 +336,15 @@ def _parse_airport_location(airport_name: Any) -> tuple[str | None, str | None]:
     return (loc_part or None), None
 
 
+def _resolve_hub_set(config: StandbyConfig) -> set[str]:
+    """Resolve target hub set, respecting CLI `--hub` (`config.active_hub`) overrides."""
+    if config.active_hub and config.active_hub.strip():
+        return {config.active_hub.strip().upper()}
+    if config.hubs:
+        return {h.strip().upper() for h in config.hubs if h.strip()}
+    return {"ORD"}
+
+
 def _build_agg_route_month(
     flights_df: pd.DataFrame,
     t100_df: pd.DataFrame,
@@ -343,7 +352,7 @@ def _build_agg_route_month(
 ) -> pd.DataFrame:
     """Build `agg_route_month` matching `dbt/models/marts/agg_route_month.sql` 1:1."""
     ua_family = config.all_operating_carriers or set(DEFAULT_UA_FAMILY_CARRIERS)
-    hub_set = {h.strip().upper() for h in config.hubs} if config.hubs else {config.active_hub}
+    hub_set = _resolve_hub_set(config)
     year_set = set(config.years)
 
     t100 = t100_df.copy()
@@ -507,7 +516,7 @@ def _build_dim_airport(
 ) -> pd.DataFrame:
     """Build `dim_airport` matching `dbt/models/marts/dim_airport.sql` plus parsed city/region."""
     ua_family = config.all_operating_carriers or set(DEFAULT_UA_FAMILY_CARRIERS)
-    hub_set = {h.strip().upper() for h in config.hubs} if config.hubs else {config.active_hub}
+    hub_set = _resolve_hub_set(config)
     year_set = set(config.years)
 
     otp_orig = pd.DataFrame(
@@ -710,7 +719,7 @@ def _build_dim_carrier(
 ) -> pd.DataFrame:
     """Build `dim_carrier` matching `dbt/models/marts/dim_carrier.sql` 1:1."""
     ua_family = config.all_operating_carriers or set(DEFAULT_UA_FAMILY_CARRIERS)
-    hub_set = {h.strip().upper() for h in config.hubs} if config.hubs else {config.active_hub}
+    hub_set = _resolve_hub_set(config)
     year_set = set(config.years)
 
     t100 = t100_df.copy()
@@ -970,7 +979,7 @@ def _build_route_map_paths(agg_route_month_df: pd.DataFrame, config: StandbyConf
     Build 2-point (`path_order` 1=origin, 2=dest) rows per active ORD destination
     for Tableau's built-in `Airport` geographic role route map (no invented lat/lon).
     """
-    hub_set = {h.strip().upper() for h in config.hubs} if config.hubs else {config.active_hub}
+    hub_set = _resolve_hub_set(config)
     active = agg_route_month_df.loc[
         agg_route_month_df["origin"].isin(hub_set)
         & (agg_route_month_df["origin"] != agg_route_month_df["dest"])
@@ -1242,6 +1251,40 @@ def _validate_exported_tables(
         if ((vals < 0.0) | (vals > 100.0)).any():
             raise ExportValidationError(f"fct_flights.{soi_col} outside [0, 100]")
 
+    if {"est_passengers", "seats_config"} <= set(fct.columns):
+        pax = pd.to_numeric(fct["est_passengers"], errors="coerce")
+        seats = pd.to_numeric(fct["seats_config"], errors="coerce")
+        both_valid = pax.notna() & seats.notna()
+        if (pax.loc[both_valid] > seats.loc[both_valid]).any():
+            raise ExportValidationError("fct_flights.est_passengers exceeds seats_config")
+
+    if {"est_passengers_adjusted", "seats_config"} <= set(fct.columns):
+        pax_adj = pd.to_numeric(fct["est_passengers_adjusted"], errors="coerce")
+        seats = pd.to_numeric(fct["seats_config"], errors="coerce")
+        both_valid = pax_adj.notna() & seats.notna()
+        if (pax_adj.loc[both_valid] > seats.loc[both_valid]).any():
+            raise ExportValidationError("fct_flights.est_passengers_adjusted exceeds seats_config")
+
+    if {"year", "soi_planning"} <= set(fct.columns):
+        y2019_mask = pd.to_numeric(fct["year"], errors="coerce") == 2019
+        if y2019_mask.any() and fct.loc[y2019_mask, "soi_planning"].notna().any():
+            raise ExportValidationError("fct_flights 2019 rows must have NULL soi_planning")
+
+    if {"is_cancelled", "soi_historical"} <= set(fct.columns):
+        canc_mask = fct["is_cancelled"].fillna(False).astype(bool)
+        if canc_mask.any() and fct.loc[canc_mask, "soi_historical"].notna().any():
+            raise ExportValidationError("fct_flights cancelled rows must have NULL soi_historical")
+
+    rmp = tables["route_map_paths.csv"]
+    if {"origin", "dest"} <= set(rmp.columns):
+        if (
+            rmp["origin"].astype(str).str.strip().str.upper()
+            == rmp["dest"].astype(str).str.strip().str.upper()
+        ).any():
+            raise ExportValidationError(
+                "route_map_paths must not contain origin == dest self-loop rows"
+            )
+
     # File size guard (< 50 MB for committed/non-full files)
     max_bytes = int(max_file_mb * 1024 * 1024)
     for fname, fpath in file_paths.items():
@@ -1352,7 +1395,7 @@ def export_tableau_extracts(
         from_processed=from_processed,
     )
 
-    hub_set = {h.strip().upper() for h in config.hubs} if config.hubs else {config.active_hub}
+    hub_set = _resolve_hub_set(config)
     year_set = set(config.years)
     mkt_set = {c.strip().upper() for c in config.marketing_carriers} or {"UA"}
 
@@ -1399,9 +1442,26 @@ def export_tableau_extracts(
         else config.repo_root / "docs" / "phase4_validation_summary.json"
     )
     resolved_val_path = validation_summary_path or default_val_path
+    val_json: dict[str, Any] | None = None
     if resolved_val_path.is_file():
-        val_json = json.loads(resolved_val_path.read_text(encoding="utf-8"))
-    else:
+        candidate_json = json.loads(resolved_val_path.read_text(encoding="utf-8"))
+        candidate_meta = candidate_json.get("metadata", {})
+        if validation_summary_path is not None or (
+            candidate_meta.get("hub") == config.active_hub
+            and candidate_meta.get("years") == config.years
+        ):
+            val_json = candidate_json
+        else:
+            logger.info(
+                "Cached validation summary %s metadata (hub=%s, years=%s) mismatches "
+                "config (hub=%s, years=%s); recomputing validation summary",
+                resolved_val_path,
+                candidate_meta.get("hub"),
+                candidate_meta.get("years"),
+                config.active_hub,
+                config.years,
+            )
+    if val_json is None:
         from standby.validation.soi_validation import run_soi_validation
 
         report = run_soi_validation(

@@ -217,7 +217,7 @@ Every column carries an explicit **Confidence Tier** per `src/standby/enrichment
 | 5 | `is_hub` | `BOOL` | `derived` | NOT NULL | `TRUE` if `airport_code` is in configured `hubs` (`ORD`). |
 | 6 | `has_domestic_service` | `BOOL` | `derived` | NOT NULL | `TRUE` if served in domestic OTP or domestic T-100 (`DU`/`DF`). |
 | 7 | `has_international_service` | `BOOL` | `derived` | NOT NULL | `TRUE` if served in international T-100 (`IU`/`IF`). |
-| 8 | `confidence_tier` | `STRING` | `actual` | NOT NULL | `'actual'`. |
+| 8 | `confidence_tier` | `STRING` | `actual` | NOT NULL | SQL value literal `'actual'` (source BTS station master records; note the schema metadata column itself is registered `derived` in `COLUMN_CONFIDENCE_TIERS`). |
 | *T1* | `city_name` *(Tableau CSV only)* | `STRING` | `derived` | Nullable | City parsed from `L_AIRPORT` (`split(':')[0].rsplit(',')[0]`) in `exports/tableau/dim_airport.csv`. |
 | *T2* | `state_or_country` *(Tableau CSV only)* | `STRING` | `derived` | Nullable | State/country parsed from `L_AIRPORT` (`split(':')[0].rsplit(',')[1]`) in `exports/tableau/dim_airport.csv`. |
 
@@ -236,7 +236,7 @@ Every column carries an explicit **Confidence Tier** per `src/standby/enrichment
 | 5 | `is_shared_cpa_carrier` | `BOOL` | `derived` | NOT NULL | `TRUE` for multi-brand regional CPA carriers (`OO`, `YX`, `YV`, `ZW`). |
 | 6 | `history_summary` | `STRING` | `actual` | Nullable | Pipe-delimited distinct historical carrier eras from `L_CARRIER_HISTORY.csv`. |
 | 7 | `history_era_count` | `INT64` | `derived` | NOT NULL | Number of `L_CARRIER_HISTORY` rows aggregated for this carrier (`0`+). |
-| 8 | `confidence_tier` | `STRING` | `actual` | NOT NULL | `'actual'`. |
+| 8 | `confidence_tier` | `STRING` | `actual` | NOT NULL | SQL value literal `'actual'` (source BTS carrier master records; note the schema metadata column itself is registered `derived` in `COLUMN_CONFIDENCE_TIERS`). |
 
 ---
 
@@ -259,7 +259,7 @@ Every column carries an explicit **Confidence Tier** per `src/standby/enrichment
 | 11 | `tsa_throughput` | `INT64` | `actual` | Nullable | Deduplicated daily national TSA checkpoint passenger count. |
 | 12 | `tsa_ratio_month` | `FLOAT64` | `derived` | Nullable | `tsa_throughput / mean_year_month(tsa_throughput)`. |
 | 13 | `tsa_demand_multiplier` | `FLOAT64` | `estimated` | Nullable (`[0.80, 1.20]`) | Damped monthly-relative TSA multiplier (`alpha = 0.35`, clipped `[0.80, 1.20]`). |
-| 14 | `tsa_ratio_year` | `FLOAT64` | `derived` | Nullable | `tsa_throughput / mean_year(tsa_throughput)` used in `S_demand`. |
+| 14 | `tsa_ratio_year` | `FLOAT64` | `estimated` | Nullable | `tsa_throughput / mean_year(tsa_throughput)` used in `S_demand` (matches `marts.fct_flights.tsa_ratio_year` and `COLUMN_CONFIDENCE_TIERS`). |
 
 ---
 
