@@ -1,10 +1,10 @@
 # Technical Decisions & Assumptions Log (`docs/decisions.md`)
 
-Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**, and the **6 Phase 4 Standby Opportunity Index & validation decisions (`D-29` through `D-34`)**.
+Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**, the **6 Phase 4 Standby Opportunity Index & validation decisions (`D-29` through `D-34`)**, and the **4 Phase 5 Tableau delivery & documentation decisions (`D-35` through `D-38`)**.
 
 ---
 
-## Summary Table (`D-01` – `D-34`)
+## Summary Table (`D-01` – `D-38`)
 
 | ID | Category | Decision Title | Choice Made | Status |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-10** | Transformations | Hybrid Python + `dbt Core` Architecture | Python (`pandas`, `pandera`) for EL + enrichment + validation; `dbt Core` on BigQuery for `raw → staging → intermediate → marts` | Approved (Baseline) |
 | **D-11** | Orchestration & CI | Single Entry Point & Secret-Free GitHub Actions CI | Single CLI (`python -m standby run` / `make all`) + GitHub Actions running `ruff`, `pytest` on `data/sample/`, and `dbt parse` without GCP secrets | Approved (Baseline) |
 | **D-12** | Validation | Three-Pillar SOI Validation Suite | Time-based backtest (Spearman $\rho$, top-decile hit rate) + face-validity checks + weight sensitivity analysis + 5 automated sanity checks | Approved (Baseline) |
-| **D-13** | Repository | Public GitHub Repo & Phased PR Workflow | Public GitHub repo `united-standby-analytics`, one PR per phase (PR #1–#6), stopping at Gates 1, 2, and 3 | Approved (Baseline) |
+| **D-13** | Repository | Public GitHub Repo & Phased PR Workflow | Public GitHub repo `united-standby-analytics`, one PR per phase (`PR #1–#5` Phases 0–4; `PR #6–#8` intermediate/hotfix PRs; `PR #9` Phase 5), stopping at Gates 1, 2, and 3 | Approved (Baseline) |
 | **D-14** | Data Source (Phase 0) | BTS Marketing Carrier OTP vs. Reporting Carrier OTP | Use `On_Time_Marketing_Carrier_On_Time_Performance_Beginning_January_2018` (`Marketing_Airline_Network = 'UA'`, `Duplicate = 'N'`) instead of Reporting Carrier OTP | Phase 0 Empirical |
 | **D-15** | Schema Standardization (Phase 0) | `PREZIP` Column Stripping & Historical Express Partner Inclusion (`EV`, `AX`, `ZW`) | Strip `'Operating_Airline '` trailing space & empty 120th column; include pre-COVID 2019 partners `EV` (ExpressJet) and `AX` (Trans States) alongside `UA, OO, YX, YV, G7, C5, ZW` | Phase 0 Empirical |
 | **D-16** | Enrichment (Phase 0) | Two-Tier FAA Registry Lookup (`MASTER.txt` → `DEREG.txt`) + Commercial Manufacturer Filter & `80`-Tail Overrides | Filter `MASTER.txt` & `DEREG.txt` to commercial airliner manufacturers (`BOEING`, `AIRBUS%`, `EMBRAER%`, `YABORA%`, `BOMBARDIER%`, `CANADAIR%`, `MHI RJ%`) + resolve `80` historical regional tails (`43` unmatched + `37` N-number-reused) in `tail_overrides.csv` | Phase 0 Empirical |
@@ -42,10 +42,14 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-32** | Null & Eligibility Gates (Phase 4) | `SC-5` Zero Imputation, Cancelled `soi_historical = NULL`, and Planning Survivorship | Enforce `NULL` on both indices when T-100 is unavailable/unmatched (`SC-5`), `NULL` on `soi_historical` when `is_cancelled`, and score cancelled flights in `soi_planning` to avoid survivorship bias | Phase 4 SOI & Validation |
 | **D-33** | Validation Suite (Phase 4) | Three-Pillar Section 6 Validation Gates (`standby validate-index`) | Gate full runs on Fixed Holdout + Expanding Walk-Forward ($\rho \ge 0.55$, lift $\ge 3.0\times$, coverage $\ge 95\%$), monotonic Face-Validity ordering + Welch/Mann-Whitney separation, and Weight Sensitivity ($\rho \ge 0.85$), outputting `docs/phase4_validation_summary.json` | Phase 4 SOI & Validation |
 | **D-34** | Package Architecture (Phase 4) | Shared `DEFAULT_UA_FAMILY_CARRIERS` in `standby.config` & Lazy Confidence Tagging | Define `DEFAULT_UA_FAMILY_CARRIERS` in `standby.config` and lazy-import `tag_dataframe_confidence_tiers` in `score_flights()` to guarantee cycle-free imports across `scoring`, `validation`, and `enrichment` | Phase 4 SOI & Validation |
+| **D-35** | BI Delivery (Phase 5) | Stratified `100k` Default Tableau Flight Extract & `< 50 MB` File Cap | Default `fct_flights_tableau.csv` to deterministic proportional stratified sampling (`100,000` rows across `year, month, op_carrier`, `seed=42`, `4`-decimal rounding) alongside `recent-12m` and gitignored `*_full.csv` modes | Phase 5 Tableau & Docs |
+| **D-36** | Geospatial BI (Phase 5) | Built-In Tableau `Airport` Geo Role via `route_map_paths.csv` | Export 2-point `route_map_paths.csv` (`path_order` 1=`ORD`, 2=`dest`, excluding `ORD -> ORD` ferry loops) using Tableau's built-in `Airport` geographic role with zero invented coordinates | Phase 5 Tableau & Docs |
+| **D-37** | BI Modeling (Phase 5) | Parsed `dim_airport` City/Region & International `agg_route_month` Null Boundary | Parse `city_name` and `state_or_country` from `L_AIRPORT` in `dim_airport.csv` while preserving `otp_* = NULL` and `data_granularity = 'route_month_only_v1'` on international segments | Phase 5 Tableau & Docs |
+| **D-38** | Quality & Docs (Phase 5) | Post-Export Invariant Gate & 157-Column Confidence-Tiered Data Dictionary | Block `export-tableau` on non-empty CSVs, unique PKs, `SC-5`, `[0,1]`/`[0,100]` bounds, zero PII, and `< 50 MB` file size; document all `157` BigQuery mart columns (`actual`/`derived`/`estimated`) | Phase 5 Tableau & Docs |
 
 ---
 
-## Detailed Decision Records (`D-01` – `D-18`)
+## Detailed Decision Records (`D-01` – `D-38`)
 
 ### D-01: Target Standby Traveler Type (`Employee / Non-Rev Standby`)
 - **Context:** Airline standby lists include both revenue standbys (same-day changes, missed connections, Premier upgrades) and non-revenue employee/pass-rider standbys (`SA`), who board only after every revenue and IRROPS-reaccommodated passenger is seated.
@@ -91,7 +95,7 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 
 ### D-09: Tableau Public Extracts & Dashboard Specification
 - **Context:** Tableau Public does not support live authenticated connections to BigQuery and enforces row limits on packaged extracts.
-- **Decision:** Export optimized CSV extracts from the BigQuery `marts` tables (`fct_flights`, `agg_route_month`, `dim_*`) to `exports/tableau/` (~831k domestic flight rows + ~15k route-month rows, well within Tableau Public's 15M row limit), and deliver complete calculated-field formulas and a dashboard wireframe specification in `docs/tableau_dashboard_spec.md`.
+- **Decision:** Export optimized CSV extracts from the BigQuery `marts` tables (`fct_flights`, `agg_route_month`, `dim_*`) to `exports/tableau/` (baseline estimate `~831k` domestic flight rows + `~15k` route-month rows; empirically `830,941` domestic flights stratified to `100,000` Tableau rows per `D-35` + `20,877` route-month rows, well within Tableau Public's 15M row limit), and deliver complete calculated-field formulas and a dashboard wireframe specification in `docs/tableau_dashboard_spec.md`.
 - **Rationale & Implications:** Ensures fast dashboard rendering and self-contained reproducibility.
 
 ### D-10: Hybrid Python + `dbt Core` Transformation Split
@@ -112,10 +116,10 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
   3. **Face-Validity & Weight Sensitivity:** Verify peak holidays (Thanksgiving Sunday, Christmas, Spring Break) score low vs. late-January mid-week troughs scoring high, and quantify ranking stability across 5 alternative weightings.
 - **Rationale & Implications:** Transparently documents that backtesting measures consistency between planning and historical proxies, not ground-truth clearance accuracy.
 
-### D-13: Public GitHub Repository & Six-PR Phased Workflow with Stop Gates
+### D-13: Public GitHub Repository & Phased PR Workflow with Stop Gates
 - **Context:** Structured code review across phases mirrors real-world engineering teams and enforces review gates after Phase 0, after Enrichment, and after Index Validation.
-- **Decision:** Maintain a 1-PR-per-phase workflow (`PR #1` Phase 0 Validation + Architecture; `PR #2` Ingestion + Manifest + Raw Load; `PR #3` Enrichment + Reference Tables; `PR #4` dbt Staging → Marts + CI; `PR #5` SOI + Validation; `PR #6` Tableau Extracts + Dashboard Spec + Final README).
-- **Rationale & Implications:** Keeps diffs focused and auditable at each stop gate.
+- **Decision:** Maintain a 1-PR-per-phase workflow (`PR #1` Phase 0 Validation + Architecture; `PR #2` Ingestion + Manifest + Raw Load; `PR #3` Enrichment + Reference Tables; `PR #4` dbt Staging → Marts + CI; `PR #5` SOI + Validation; `PR #9` Phase 5 Tableau Extracts + Dashboard Spec + Final README). *Note: Intermediate GitHub PRs `#6`–`#8` were Phase 4 post-review hotfix/documentation PRs from branch `claude/sharp-planck-0w5dly`, shifting the Phase 5 PR number from `#6` to `#9`.*
+- **Rationale & Implications:** Keeps diffs focused and auditable at each stop gate while maintaining 1:1 traceability to actual GitHub PR history.
 
 ---
 
@@ -256,5 +260,30 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 - **Context:** `standby.validation.sanity` and `standby.scoring.soi` both referenced `DEFAULT_UA_FAMILY_CARRIERS` from `standby.enrichment.load_factor`, while `standby.enrichment.pipeline` imported `standby.validation.sanity` and `standby.validation.soi_validation` imported `standby.scoring.soi` — creating an import-order circular dependency.
 - **Decision:** Define `DEFAULT_UA_FAMILY_CARRIERS` in `src/standby/config.py` (re-exported by `load_factor.py` for compatibility) and lazy-import `tag_dataframe_confidence_tiers` inside `score_flights()`.
 - **Rationale & Implications:** Guarantees `standby.scoring`, `standby.validation`, and `standby.enrichment` can be imported in any order in a fresh Python interpreter.
+
+---
+
+## Phase 5 Tableau Public Delivery & Portfolio Documentation (`D-35` – `D-38`)
+
+### D-35: Stratified `100,000`-Row Default Tableau Flight Extract & `< 50 MB` File Cap
+- **Context:** Full `fct_flights` spans `830,941` rows across 75 columns (`>250 MB` as uncompressed CSV), exceeding GitHub's recommended 50 MB file warning threshold and slowing Tableau Public browser rendering.
+- **Decision:** Default `python -m standby export-tableau` (`config.export.tableau_flight_mode: stratified`) to a deterministic Hamilton largest-remainder stratified sample (`100,000` rows across `(year, month, op_carrier)` with `seed = 42`, `51` BI columns, `4`-decimal float precision = `30.4 MiB`), while supporting `--flight-mode recent-12m` and gitignored `--flight-mode full` (`exports/tableau/*_full.csv`).
+- **Rationale & Implications:** Keeps the entire committed `exports/tableau/` suite at `34.91 MiB` total while preserving proportional representation across all 56 months and all 9 carriers.
+
+### D-36: Built-In Tableau `Airport` Geo Role via `route_map_paths.csv`
+- **Context:** Plotting an `ORD` hub-and-spoke route map in Tableau Public requires origin-destination path rows, and neither BTS OTP nor T-100 ships airport latitude/longitude coordinates.
+- **Decision:** Export `exports/tableau/route_map_paths.csv` with 2 rows per active non-self `ORD` destination (`path_order` `1 = ORD`, `2 = dest`, excluding `147` zero-passenger `ORD -> ORD` T-100 reposition rows), exposing `airport_code` for Tableau's built-in **`Airport`** geographic role without inventing coordinates.
+- **Rationale & Implications:** Complies strictly with Ground Rule #1 (no synthetic coordinates) while supporting a domestic + international spoke map (`348` destinations, `696` path rows).
+
+### D-37: Parsed `dim_airport` City/Region & International `agg_route_month` Null Boundary
+- **Context:** BTS `L_AIRPORT` encodes city and region inside a single string (`"Chicago, IL: Chicago O'Hare International"`), and international T-100 rows (`is_international = true`) lack OTP flight-level metrics (`D-04`).
+- **Decision:** Parse `city_name` and `state_or_country` deterministically in `exports/tableau/dim_airport.csv` for BI region filtering while keeping `marts.dim_airport` strictly aligned to 8 columns, and enforce `otp_* = NULL` alongside `data_granularity = 'route_month_only_v1'` on all `2,300` international rows in `agg_route_month.csv`.
+- **Rationale & Implications:** Delivers intuitive BI geography filters without altering BigQuery mart schemas or conflating domestic and international granularity.
+
+### D-38: Post-Export Invariant Gate & 157-Column Confidence-Tiered Data Dictionary
+- **Context:** Publishing CSV extracts alongside portfolio documentation creates risk of schema drift, silent `SC-5` leakage, PII exposure, or oversized commits.
+- **Decision:** Gate `export_tableau_extracts()` on automated post-export validation (non-empty CSVs, unique PKs, `SC-5` null invariant on unmatched T-100 rows, `[0, 1]` LF & `[0, 100]` SOI bounds, zero forbidden PII columns, and `< 50 MB` file cap) and document all `157` BigQuery mart columns (`actual`/`derived`/`estimated`) in `docs/data_dictionary.md`.
+- **Rationale & Implications:** Guarantees every published extract and documentation table reconciles 1:1 with the dbt marts (`dbt/models/marts/`) and Python validation outputs.
+
 
 
