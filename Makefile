@@ -1,4 +1,4 @@
-.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau dbt-parse dbt-compile dbt-docs run all
+.PHONY: setup lint format-check test manifest ingest-sample score-sample validate-index-sample validate-index export-tableau-sample export-tableau dbt-parse dbt-compile dbt-docs run bq-load dbt-build all
 
 VENV ?= .venv
 PYTHON := $(VENV)/bin/python
@@ -41,15 +41,24 @@ export-tableau:
 	$(PYTHON) -m standby export-tableau --hub ORD --years 2019,2023-2026
 
 dbt-parse:
-	$(DBT) parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+	$(DBT) parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
 
 dbt-compile:
-	$(DBT) compile --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+	$(DBT) compile --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
 
 dbt-docs:
-	$(DBT) docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+	$(DBT) docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
 
 run:
 	$(PYTHON) -m standby run --hub ORD --years 2019,2023-2026 --dry-run
+
+# Live BigQuery targets (not part of `all`): need Application Default Credentials
+# (`gcloud auth application-default login`) for the project in config/standby.yaml,
+# or the one named by GCP_PROJECT_ID. Add SAMPLE=1 to bq-load to load data/sample/ instead.
+bq-load:
+	$(PYTHON) -m standby run --hub ORD --years 2019,2023-2026 $(if $(SAMPLE),--sample,)
+
+dbt-build:
+	$(DBT) build --target dev --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
 
 all: lint format-check test dbt-parse dbt-compile dbt-docs run

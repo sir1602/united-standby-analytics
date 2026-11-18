@@ -11,7 +11,7 @@ This document specifies the Google Cloud BigQuery warehouse architecture for `un
 - Because our scope spans **`2019-01-01` through `2026-08-31`**, any partition older than 60 days from ingestion is **immediately deleted upon creation** by Sandbox — wiping out all `2019`, `2023`, `2024`, `2025`, and early `2026` partitions.
 
 **Required Configuration (`config/standby.yaml` & `src/standby/load/bigquery.py`):**
-- Use a **billing-enabled GCP project** (`project_id: united-standby-analytics`, location `US`) with a **`$1.00` monthly billing budget alert**.
+- Use a **billing-enabled GCP project** (`project_id: flight-standby-analytics`, location `US`; override with the `GCP_PROJECT_ID` environment variable, which `dbt/profiles.yml` also reads) with a **`$1.00` monthly billing budget alert**.
 - Explicitly enforce `partition_expiration_ms: null` (`NONE`) on both datasets and partitioned tables (`default_table_expiration_ms = None`, `default_partition_expiration_ms = None` in `src/standby/load/bigquery.py`).
 - Operational cost remains **`$0.00/month`** because total storage and monthly query scan volume sit far below the BigQuery Free Tier (**10 GiB active storage/month** and **1 TiB on-demand query processing/month**).
 
@@ -63,7 +63,7 @@ This document specifies the Google Cloud BigQuery warehouse architecture for `un
 
 ## 5. Unpartitioned vs. Partition-Filtered Benchmark SQL & `bq query --dry_run`
 
-> **Transparency Note:** No GCP project or service-account credentials are attached to this repository's offline CI environment (`DISPATCH.md`). Accordingly, **zero live `totalBytesProcessed` byte counts are fabricated below**. Once you authenticate `gcloud auth login` against your billing-enabled GCP project (`united-standby-analytics`), run the exact benchmark SQL pair and `bq query --dry_run` commands below to capture live byte-scan metrics.
+> **Transparency Note:** No GCP project or service-account credentials are attached to this repository's offline CI environment (`DISPATCH.md`). Accordingly, **zero live `totalBytesProcessed` byte counts are fabricated below**. Once you authenticate `gcloud auth login` against your billing-enabled GCP project (`flight-standby-analytics`), run the exact benchmark SQL pair and `bq query --dry_run` commands below to capture live byte-scan metrics.
 
 ### 5.1 Benchmark SQL Pair (Same Output, Unpartitioned / Non-Pruned vs. Partition-Pruned + Clustered)
 
@@ -71,8 +71,8 @@ This document specifies the Google Cloud BigQuery warehouse architecture for `un
 Create an unpartitioned, unclustered baseline copy (optional benchmark fixture) and scan all `830,941` rows across all `1,704` dates:
 ```sql
 -- Optional unpartitioned baseline fixture (for 1:1 storage/scan comparison)
-CREATE OR REPLACE TABLE `united-standby-analytics.marts._bench_fct_flights_unpartitioned` AS
-SELECT * FROM `united-standby-analytics.marts.fct_flights`;
+CREATE OR REPLACE TABLE `flight-standby-analytics.marts._bench_fct_flights_unpartitioned` AS
+SELECT * FROM `flight-standby-analytics.marts.fct_flights`;
 
 -- Query A1: Scans 100% of _bench_fct_flights_unpartitioned (no partition or cluster pruning)
 SELECT
@@ -82,7 +82,7 @@ SELECT
     fleet_subtype,
     est_open_seats_adjusted,
     ROUND(soi_planning, 2) AS soi_planning
-FROM `united-standby-analytics.marts._bench_fct_flights_unpartitioned`
+FROM `flight-standby-analytics.marts._bench_fct_flights_unpartitioned`
 WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
   AND origin = 'ORD'
   AND dest = 'DEN'
@@ -100,7 +100,7 @@ SELECT
     fleet_subtype,
     est_open_seats_adjusted,
     ROUND(soi_planning, 2) AS soi_planning
-FROM `united-standby-analytics.marts.fct_flights`
+FROM `flight-standby-analytics.marts.fct_flights`
 WHERE FORMAT_DATE('%Y-%m', flight_date) = '2025-07'
   AND origin = 'ORD'
   AND dest = 'DEN'
@@ -118,7 +118,7 @@ SELECT
     fleet_subtype,
     est_open_seats_adjusted,
     ROUND(soi_planning, 2) AS soi_planning
-FROM `united-standby-analytics.marts.fct_flights`
+FROM `flight-standby-analytics.marts.fct_flights`
 WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
   AND origin = 'ORD'
   AND dest = 'DEN'
@@ -133,14 +133,14 @@ Run both dry-run commands from a shell authenticated to your GCP project (`$0.00
 # 1. Baseline A1 (if _bench_fct_flights_unpartitioned exists) or A2 (non-prunable FORMAT_DATE on fct_flights)
 bq query --use_legacy_sql=false --dry_run --format=prettyjson \
   "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
-   FROM \`united-standby-analytics.marts._bench_fct_flights_unpartitioned\`
+   FROM \`flight-standby-analytics.marts._bench_fct_flights_unpartitioned\`
    WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
      AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
   | jq -r '.statistics.totalBytesProcessed'
 
 bq query --use_legacy_sql=false --dry_run --format=prettyjson \
   "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
-   FROM \`united-standby-analytics.marts.fct_flights\`
+   FROM \`flight-standby-analytics.marts.fct_flights\`
    WHERE FORMAT_DATE('%Y-%m', flight_date) = '2025-07'
      AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
   | jq -r '.statistics.totalBytesProcessed'
@@ -148,7 +148,7 @@ bq query --use_legacy_sql=false --dry_run --format=prettyjson \
 # 2. Partition-pruned + clustered Query B on marts.fct_flights
 bq query --use_legacy_sql=false --dry_run --format=prettyjson \
   "SELECT flight_date, crs_dep_time, op_carrier, fleet_subtype, est_open_seats_adjusted, ROUND(soi_planning, 2) AS soi_planning
-   FROM \`united-standby-analytics.marts.fct_flights\`
+   FROM \`flight-standby-analytics.marts.fct_flights\`
    WHERE flight_date BETWEEN DATE '2025-07-01' AND DATE '2025-07-31'
      AND origin = 'ORD' AND dest = 'DEN' AND op_carrier = 'UA'" \
   | jq -r '.statistics.totalBytesProcessed'
@@ -170,7 +170,7 @@ SELECT
     f.remaining_performed_backups,
     f.soi_historical,
     f.soi_planning
-FROM `united-standby-analytics.marts.fct_flights` AS f
+FROM `flight-standby-analytics.marts.fct_flights` AS f
 WHERE f.flight_date IN (DATE '2024-12-01', DATE '2025-11-30')
   AND f.origin = 'ORD'
   AND NOT f.is_cancelled
@@ -192,7 +192,7 @@ SELECT
     passengers,
     ROUND(t100_load_factor, 4) AS t100_load_factor,
     data_granularity
-FROM `united-standby-analytics.marts.agg_route_month`
+FROM `flight-standby-analytics.marts.agg_route_month`
 WHERE origin = 'ORD'
   AND is_international = TRUE
   AND year = 2025
@@ -207,3 +207,43 @@ ORDER BY t100_load_factor ASC, departures_performed DESC;
 2. **Respect `require_partition_filter` Option:** Once interactive BI extracts are cached in Tableau Public, enabling `require_partition_filter = true` on `fct_flights` prevents accidental full-table scans by ad-hoc SQL consumers.
 3. **Avoid `SELECT *` on `fct_flights`:** Select only required columns (75 columns total) — BigQuery's Capacitor columnar storage bills strictly on referenced columns.
 4. **Refresh Cadence:** BTS releases monthly OTP and T-100 batches monthly; re-running `python -m standby run && dbt build` refreshes the full `~831k`-row `marts` layer cleanly in `WRITE_TRUNCATE` / full-refresh mode well inside the monthly free tier.
+
+---
+
+## 7. Live Warehouse: `flight-standby-analytics`
+
+**Status (2026-11-18): set up and loaded with the committed sample slice, not the full dataset.**
+
+| Item | State |
+|---|---|
+| GCP project | `flight-standby-analytics` (billing enabled; datasets show no Sandbox-imposed 60-day default expiration) |
+| Datasets | `raw`, `staging`, `intermediate`, `marts`, all in `US`, no default table or partition expiration |
+| `raw` tables | `otp_marketing_flights` (80 rows; `DAY`-partitioned on `flight_date`, clustered by `origin, dest, op_carrier`), `t100_segments` (1,472), `bts_lookups` (810), `faa_acftref` (19), `faa_aircraft_registry` (17), `tsa_daily_throughput` (62), plus the dbt seeds `seat_config` (31), `tail_overrides` (152), `faa_t100_crosswalk` (56) |
+| `staging` / `intermediate` | All 8 staging and 5 intermediate dbt models, as views |
+| `marts` | `fct_flights` (80 rows; `DAY`-partitioned on `flight_date`, clustered by `origin, dest, op_carrier`), `agg_route_month`, `dim_aircraft`, `dim_airport`, `dim_carrier`, `dim_date`, as tables |
+
+### How the sample was loaded
+
+The cloud session that set this up had no direct GCP credentials, only a SQL-capable BigQuery connector. So the load ran as SQL instead of through `standby run` and `dbt build`:
+
+1. `python -m standby load-raw --sample --dry-run` produced the raw tables. Each table's schema, partitioning and clustering came from `standby.load.bigquery.build_load_job_config`, the same function the live loader uses. The rows were inserted with `CREATE TABLE` + `INSERT`. The OTP table therefore has the 31-column `load-raw` shape, which `stg_otp_flights` reads identically to the enriched `run` shape.
+2. The dbt seeds were loaded into `raw` using the `+column_types` declared in `dbt/dbt_project.yml`.
+3. Every model was built from dbt's own compiled SQL (`dbt compile`), in dependency order. Views and tables follow each model's `materialized`, `partition_by` and `cluster_by` config.
+
+### Verification
+
+- **Raw layer:** all 108 per-column aggregates match the local source frames exactly (row counts, non-null counts, numeric sums, MD5-sum fingerprints of string and date columns) across all 9 raw tables.
+- **SOI parity:** `marts.fct_flights` matches the Python pipeline's scored output for the same sample on 24 metrics, within 1e-9 relative tolerance. These are flight-ID-hash-weighted sums of `soi_historical`, `soi_planning`, all 8 sub-scores, load factors, open seats, `seats_config`, displacement, backups and TSA ratio, plus the `lf_source`, `aircraft_source`, `seat_config_source`, `fleet_subtype` and `hour_block` distributions. Counts: 70 `soi_historical` and 20 `soi_planning` scored, as in Python.
+- **dbt tests:** all **231 of 231** tests in the project pass against the live warehouse, with 0 failing rows. That covers 117 `not_null`, 57 `accepted_range`, 21 `unique`, 12 `accepted_values`, 10 `relationships`, 7 `not_null_where` and 3 `unique_combination_of_columns`, plus the 4 singular tests (`fct_flights` grain, `SC-1` passenger bounds, `SC-5` no silent T-100 imputation, SOI leakage & bounds). Each test ran its exact dbt-compiled SQL.
+
+### Loading the full dataset
+
+Run these from a machine with Application Default Credentials for the project, and with `data/raw/` populated per [`docs/data_acquisition.md`](data_acquisition.md):
+
+```bash
+gcloud auth application-default login
+make bq-load     # standby run without --dry-run: WRITE_TRUNCATE loads into raw.*
+make dbt-build   # dbt seed + run + test against the dev target (oauth / ADC)
+```
+
+`make bq-load` replaces each raw table, and `make dbt-build` recreates the seeds, views and marts. Nothing from the sample load needs to be removed first. Set `GCP_PROJECT_ID` to point both the loader and dbt at a different project.

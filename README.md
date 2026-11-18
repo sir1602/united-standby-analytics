@@ -115,6 +115,7 @@ $$\text{SOI} = 0.50 \cdot S_{\text{open}} + 0.20 \cdot S_{\text{disp}} + 0.20 \c
 Full warehouse design, billing rules, and benchmark queries are documented in [`docs/bigquery_optimization.md`](docs/bigquery_optimization.md).
 
 - **Billing-Enabled Free Tier (`D-08` — No BigQuery Sandbox):** BigQuery Sandbox enforces a mandatory **60-day partition expiration** based on `flight_date`, which would immediately delete all `2019` and historical `2023–2025` partitions. This project configures a **billing-enabled GCP project** (`$1.00` monthly budget alert, `partition_expiration_ms = NULL`), remaining `$0.00/month` within BigQuery's Free Tier (`10 GiB` active storage, `1 TiB` query processing/month; entire `raw` + `marts` footprint `< 0.9 GiB`).
+- **Live Warehouse (`flight-standby-analytics`, `US`):** Datasets `raw`, `staging`, `intermediate`, and `marts` exist with no table or partition expiration. They currently hold the **committed `data/sample/` slice** (80 flights, 1,472 T-100 rows), not the full 830,941-flight dataset. All 19 dbt models are built and checked against the Python pipeline. See [`docs/bigquery_optimization.md` §7](docs/bigquery_optimization.md#7-live-warehouse-flight-standby-analytics) for what was verified and how to load the full data.
 - **Partitioning & Clustering:** `raw.otp_marketing_flights` and `marts.fct_flights` use **`DAY` partitioning on `flight_date`** (`1,704` daily partitions across `2019` + `2023-01..2026-08`, `42.6%` of BigQuery's `4,000`-partition limit) and **`CLUSTER BY origin, dest, op_carrier`**.
 - **Unpartitioned vs. Partition-Filtered Benchmark (`bq query --dry_run`):**
   - *Unpartitioned / Non-Prunable Baseline:* Scanning `_bench_fct_flights_unpartitioned` or filtering `marts.fct_flights` via `WHERE FORMAT_DATE('%Y-%m', flight_date) = '2025-07'` prevents partition elimination and scans all `1,704` daily partitions (`830,941` rows).
@@ -167,7 +168,7 @@ Full warehouse design, billing rules, and benchmark queries are documented in [`
 | [`docs/data_dictionary.md`](docs/data_dictionary.md) | Full column-level specification for all **`157` BigQuery mart columns** (`actual`/`derived`/`estimated`) + Tableau CSV projections |
 | [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) | **"United Standby Opportunity Explorer"** Tableau Public wireframe, relationships, `22` calculated fields, `9` views, `6` filters, and `4` mandatory disclaimers |
 | [`docs/bigquery_optimization.md`](docs/bigquery_optimization.md) | Billing-enabled BigQuery setup (`D-08`, why Sandbox's 60-day expiry fails), `DAY(flight_date)` partitioning, clustering, and unpartitioned vs. pruned `bq query --dry_run` SQL |
-| [`docs/decisions.md`](docs/decisions.md) | Full Technical Decisions & Assumptions Log (**`D-01` through `D-38`**) |
+| [`docs/decisions.md`](docs/decisions.md) | Full Technical Decisions & Assumptions Log (**`D-01` through `D-39`**) |
 | [`exports/tableau/`](exports/tableau/) | 8 validated BI CSV extracts (`34.91 MiB` total; `fct_flights_tableau.csv` stratified `100k` rows) + `export_metadata.json` |
 | [`notebooks/00_phase0_validation.ipynb`](notebooks/00_phase0_validation.ipynb) | Executed Phase 0 EDA reproduction notebook |
 
@@ -238,10 +239,13 @@ make run
 make validate-index
 make export-tableau
 
-# 6. Optional live BigQuery load: set bigquery.project_id in config/standby.yaml, authenticate
-#    with `gcloud auth application-default login`, then run without --dry-run
-#    (fails fast with BigQueryCredentialsError if no credentials are found)
-.venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
+# 6. Optional live BigQuery load into `flight-standby-analytics` (config/standby.yaml; override
+#    with GCP_PROJECT_ID, which dbt reads too): authenticate with
+#    `gcloud auth application-default login`, then load raw and build/test the dbt marts
+#    (bq-load fails fast with BigQueryCredentialsError if no credentials are found;
+#    `make bq-load SAMPLE=1` loads the committed sample slice instead of data/raw/)
+make bq-load
+make dbt-build
 ```
 
 ### CLI Options for `export-tableau`

@@ -236,6 +236,20 @@ def test_cli_verify_manifest_ingest_load_raw_and_run_sample(
     assert val_summary.is_file()
 
 
+def test_load_config_gcp_project_id_env_overrides_yaml(
+    repo_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`GCP_PROJECT_ID` (also read by dbt) overrides `bigquery.project_id`; blank falls back to YAML."""
+    monkeypatch.delenv("GCP_PROJECT_ID", raising=False)
+    assert load_config(repo_root=repo_root).bigquery.project_id == "flight-standby-analytics"
+
+    monkeypatch.setenv("GCP_PROJECT_ID", "  my-other-project  ")
+    assert load_config(repo_root=repo_root).bigquery.project_id == "my-other-project"
+
+    monkeypatch.setenv("GCP_PROJECT_ID", "   ")
+    assert load_config(repo_root=repo_root).bigquery.project_id == "flight-standby-analytics"
+
+
 def test_parse_years_arg_and_load_config_rejects_invalid_and_empty_years(repo_root: Path) -> None:
     """`parse_years_arg` and `load_config` reject malformed, reversed, and empty year specs."""
     assert parse_years_arg(None, [2024, 2019]) == [2019, 2024]

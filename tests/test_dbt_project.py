@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 import subprocess
 import sys
@@ -70,6 +71,9 @@ def _run_dbt(args: list[str], repo_root: Path) -> subprocess.CompletedProcess[st
         "--profiles-dir",
         str(dbt_dir),
         "--no-send-anonymous-usage-stats",
+        # Offline commands must not introspect the warehouse: with a real project ID and the
+        # placeholder CI token, cache population fails with a 401 instead of compiling.
+        "--no-populate-cache",
     ]
     return subprocess.run(cmd, cwd=repo_root, capture_output=True, text=True, check=False)
 
@@ -1418,7 +1422,7 @@ def test_sc1_singular_test_catches_null_open_seats(
     )
     assert compiled_test.is_file()
     raw_sql = compiled_test.read_text(encoding="utf-8")
-    sqlite_sql = raw_sql.replace("`united-standby-analytics`.`marts`.`fct_flights`", "fct_flights")
+    sqlite_sql = re.sub(r"`[^`]+`\.`marts`\.`fct_flights`", "fct_flights", raw_sql)
 
     conn = sqlite3.connect(":memory:")
     try:

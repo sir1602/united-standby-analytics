@@ -5,7 +5,7 @@ united_standby_analytics:
       type: bigquery
       method: oauth-secrets
       token: "{{ env_var('DBT_BQ_TOKEN', 'offline-ci-placeholder') }}"
-      project: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
+      project: "{{ env_var('GCP_PROJECT_ID', 'flight-standby-analytics') }}"
       dataset: marts
       location: US
       threads: 4
@@ -14,7 +14,7 @@ united_standby_analytics:
     dev:
       type: bigquery
       method: oauth
-      project: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
+      project: "{{ env_var('GCP_PROJECT_ID', 'flight-standby-analytics') }}"
       dataset: marts
       location: US
       threads: 4
