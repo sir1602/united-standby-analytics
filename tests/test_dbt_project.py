@@ -464,24 +464,16 @@ def _build_sample_sqlite_db(
         GROUP BY year, month, op_carrier, origin, dest, bts_aircraft_type, data_source;
 
         CREATE VIEW stg_faa_aircraft AS
-        SELECT n_number, serial_number, mfr_mdl_code, year_mfr, registry_source, cancel_date
-        FROM (
-            SELECT
-                UPPER(TRIM(n_number)) AS n_number,
-                TRIM(serial_number) AS serial_number,
-                TRIM(mfr_mdl_code) AS mfr_mdl_code,
-                year_mfr,
-                LOWER(TRIM(registry_source)) AS registry_source,
-                cancel_date,
-                ROW_NUMBER() OVER (
-                    PARTITION BY UPPER(TRIM(n_number)), LOWER(TRIM(registry_source))
-                    ORDER BY COALESCE(TRIM(cancel_date), '') DESC, TRIM(serial_number) ASC
-                ) AS rn
-            FROM raw_faa_aircraft_registry
-            WHERE NULLIF(TRIM(n_number), '') IS NOT NULL
-              AND NULLIF(TRIM(mfr_mdl_code), '') IS NOT NULL
-        )
-        WHERE rn = 1;
+        SELECT
+            UPPER(TRIM(n_number)) AS n_number,
+            TRIM(serial_number) AS serial_number,
+            TRIM(mfr_mdl_code) AS mfr_mdl_code,
+            year_mfr,
+            LOWER(TRIM(registry_source)) AS registry_source,
+            NULLIF(TRIM(cancel_date), '') AS cancel_date
+        FROM raw_faa_aircraft_registry
+        WHERE NULLIF(TRIM(n_number), '') IS NOT NULL
+          AND NULLIF(TRIM(mfr_mdl_code), '') IS NOT NULL;
 
         CREATE VIEW stg_faa_acftref AS
         SELECT
@@ -494,13 +486,24 @@ def _build_sample_sqlite_db(
           AND CAST(faa_tc_max_seats AS INTEGER) >= 20;
 
         CREATE VIEW stg_tsa_throughput AS
-        WITH means AS (
+        WITH parsed AS (
+            SELECT date_day, tsa_throughput
+            FROM (
+                SELECT
+                    date_day,
+                    tsa_throughput,
+                    ROW_NUMBER() OVER (PARTITION BY date_day ORDER BY CAST(tsa_throughput AS INTEGER) DESC) AS rn
+                FROM raw_tsa_daily_throughput
+            )
+            WHERE rn = 1
+        ),
+        means AS (
             SELECT
                 date_day,
                 tsa_throughput,
                 AVG(CAST(tsa_throughput AS REAL)) OVER (PARTITION BY SUBSTR(date_day, 1, 7)) AS tsa_month_mean,
                 AVG(CAST(tsa_throughput AS REAL)) OVER (PARTITION BY SUBSTR(date_day, 1, 4)) AS tsa_year_mean
-            FROM raw_tsa_daily_throughput
+            FROM parsed
         )
         SELECT
             date_day,
@@ -516,15 +519,19 @@ def _build_sample_sqlite_db(
 
         CREATE VIEW int_aircraft_enriched AS
         WITH faa_valid AS (
-            SELECT reg.n_number, reg.registry_source, ref.faa_manufacturer, ref.faa_model, ref.faa_tc_max_seats
+            SELECT reg.n_number, reg.registry_source, ref.faa_manufacturer, ref.faa_model, ref.faa_tc_max_seats,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY reg.n_number, reg.registry_source
+                       ORDER BY COALESCE(reg.cancel_date, '') DESC, COALESCE(reg.serial_number, '') ASC
+                   ) AS rn
             FROM stg_faa_aircraft reg
             JOIN stg_faa_acftref ref ON reg.mfr_mdl_code = ref.code
         ),
         faa_master AS (
-            SELECT n_number, faa_manufacturer, faa_model, faa_tc_max_seats FROM faa_valid WHERE registry_source = 'faa_master'
+            SELECT n_number, faa_manufacturer, faa_model, faa_tc_max_seats FROM faa_valid WHERE registry_source = 'faa_master' AND rn = 1
         ),
         faa_dereg AS (
-            SELECT n_number, faa_manufacturer, faa_model, faa_tc_max_seats FROM faa_valid WHERE registry_source = 'faa_dereg'
+            SELECT n_number, faa_manufacturer, faa_model, faa_tc_max_seats FROM faa_valid WHERE registry_source = 'faa_dereg' AND rn = 1
         ),
         cw_carrier AS (
             SELECT cw.op_carrier, cw.faa_mfr, cw.faa_model, cw.subtype, cw.bts_aircraft_type, sc.seats_total, sc.seats_premium, sc.seats_economy

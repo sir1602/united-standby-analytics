@@ -22,6 +22,7 @@ from standby.enrichment import (
     normalize_tail_num,
     tag_dataframe_confidence_tiers,
 )
+from standby.ingest.faa import ingest_faa_acftref, ingest_faa_registry
 
 
 def _make_sample_otp_row(**overrides: object) -> dict[str, object]:
@@ -230,6 +231,53 @@ def test_aircraft_resolver_stearman_dual_registry_and_ga_collision_guards(
     # Row 5: Null-tail cancelled flight -> UNASSIGNED_CANCELLED
     assert resolved.loc[5, "aircraft_source"] == "UNASSIGNED_CANCELLED"
     assert pd.isna(resolved.loc[5, "seats_config"])
+
+
+def test_later_cancelled_sub_floor_dereg_record_does_not_shadow_airliner(
+    repo_root: Path, tmp_path: Path
+) -> None:
+    """
+    Regression: a 2-seat Boeing Stearman passes the BOEING prefix filter. When it was deregistered
+    AFTER a CRJ-200 on the same N-number, deduplicating DEREG before the seat floor kept the
+    Stearman and dropped the tail to `UNMATCHED`. The latest record must be chosen among
+    seat-floor-valid records only.
+    """
+    faa_dir = tmp_path / "faa"
+    faa_dir.mkdir(parents=True)
+    (faa_dir / "ACFTREF.txt").write_text(
+        "\ufeffCODE,MFR,MODEL,NO-SEATS,\n"
+        "1390008,BOMBARDIER INC                 ,CL-600-2B19         ,055,\n"
+        "1150101,BOEING                         ,A75N1               ,002,\n",
+        encoding="utf-8",
+    )
+    (faa_dir / "MASTER.txt").write_text(
+        "\ufeffN-NUMBER,SERIAL NUMBER,MFR MDL CODE,YEAR MFR,\n",
+        encoding="utf-8",
+    )
+    (faa_dir / "DEREG.txt").write_text(
+        "\ufeffN-NUMBER,SERIAL-NUMBER,MFR-MDL-CODE,YEAR-MFR,CANCEL-DATE,\n"
+        "77777,7001,1390008,2001,20050301,\n"
+        "77777,75-9999,1150101,1942,20150601,\n",
+        encoding="utf-8",
+    )
+    acftref = ingest_faa_acftref(tmp_path)
+    registry = ingest_faa_registry(tmp_path, acftref_df=acftref, commercial_only=True)
+    # Both commercial-prefix DEREG records survive ingest
+    assert len(registry.loc[registry["n_number"] == "77777"]) == 2
+
+    resolver = AircraftResolver.from_reference_dir(
+        reference_dir=repo_root / "reference",
+        faa_registry_df=registry,
+        faa_acftref_df=acftref,
+        min_faa_tc_max_seats=20,
+    )
+    resolved, _ = resolver.resolve(
+        pd.DataFrame([_make_sample_otp_row(tail_num="N77777", op_carrier="OO", year=2019)])
+    )
+    assert resolved.loc[0, "aircraft_source"] == "FAA_DEREG"
+    assert resolved.loc[0, "fleet_subtype"] == "CRJ-200"
+    assert resolved.loc[0, "faa_model"] == "CL-600-2B19"
+    assert int(resolved.loc[0, "seats_config"]) == 50
 
 
 def test_t100_load_factor_hierarchy_and_missing_month_null_invariant() -> None:

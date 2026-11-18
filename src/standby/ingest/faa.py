@@ -78,7 +78,11 @@ def ingest_faa_registry(
     acftref_df: pd.DataFrame | None = None,
     commercial_only: bool = True,
 ) -> pd.DataFrame:
-    """Ingest `MASTER.txt` and `DEREG.txt` (`utf-8-sig`, stripped, deduplicated by latest cancel_date)."""
+    """Ingest `MASTER.txt` and `DEREG.txt` (`utf-8-sig`, stripped).
+
+    `MASTER` is deduplicated per `n_number`; `DEREG` keeps every record (sorted by `n_number`,
+    latest `cancel_date` first) so the latest-record choice happens after the seat-floor filter.
+    """
     faa_dir = data_dir / "faa"
     master_path = faa_dir / "MASTER.txt"
     dereg_path = faa_dir / "DEREG.txt"
@@ -149,12 +153,15 @@ def ingest_faa_registry(
     if commercial_codes is not None:
         dereg_std = dereg_std[dereg_std["mfr_mdl_code"].isin(commercial_codes)].copy()
 
-    # Sort by cancel_date ascending and keep the latest deregistration record per n_number
-    dereg_std = (
-        dereg_std.sort_values("cancel_date", ascending=True)
-        .drop_duplicates(subset=["n_number"], keep="last")
-        .copy()
-    )
+    # Keep EVERY deregistration record. The "latest cancel_date per n_number" choice must be made
+    # only after the ACFTREF seat floor is applied (AircraftResolver / int_aircraft_enriched);
+    # collapsing here would let a later-cancelled sub-20-seat record (e.g. a 2-seat Boeing Stearman,
+    # which passes the BOEING prefix filter) shadow an earlier commercial airliner on the same N-number.
+    dereg_std = dereg_std.sort_values(
+        ["n_number", "cancel_date", "serial_number"],
+        ascending=[True, False, True],
+        kind="mergesort",
+    ).reset_index(drop=True)
 
     combined = pd.concat([master_std, dereg_std], ignore_index=True)
     logger.info(

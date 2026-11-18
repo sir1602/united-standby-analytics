@@ -286,6 +286,19 @@ class AircraftResolver:
             & (reg_joined["faa_tc_max_seats"] >= self.min_faa_tc_max_seats)
         ].copy()
 
+        # Deterministic tie-break shared with dbt `int_aircraft_enriched`:
+        # latest cancel_date first, then lowest serial_number (applied AFTER the seat floor).
+        for col in ("cancel_date", "serial_number"):
+            if col not in valid_faa.columns:
+                valid_faa[col] = ""
+        valid_faa["_cancel_sort"] = valid_faa["cancel_date"].fillna("").astype(str).str.strip()
+        valid_faa["_serial_sort"] = valid_faa["serial_number"].fillna("").astype(str).str.strip()
+        valid_faa = valid_faa.sort_values(
+            ["n_number", "_cancel_sort", "_serial_sort"],
+            ascending=[True, False, True],
+            kind="mergesort",
+        )
+
         # Tier 2: MASTER lookup (deduplicated 1:1 per n_number)
         master_df = valid_faa[valid_faa["registry_source"] == "faa_master"].drop_duplicates(
             subset=["n_number"], keep="first"
@@ -299,13 +312,10 @@ class AircraftResolver:
             for row in master_df.itertuples(index=False)
         }
 
-        # Tier 3: DEREG lookup (sorted by cancel_date ascending, keep latest per n_number)
-        dereg_df = valid_faa[valid_faa["registry_source"] == "faa_dereg"].copy()
-        if not dereg_df.empty:
-            dereg_df["cancel_date_sort"] = dereg_df["cancel_date"].fillna("").astype(str)
-            dereg_df = dereg_df.sort_values("cancel_date_sort", ascending=True).drop_duplicates(
-                subset=["n_number"], keep="last"
-            )
+        # Tier 3: DEREG lookup (latest seat-floor-valid cancel_date per n_number)
+        dereg_df = valid_faa[valid_faa["registry_source"] == "faa_dereg"].drop_duplicates(
+            subset=["n_number"], keep="first"
+        )
         self.dereg_map: dict[str, tuple[str, str, int]] = {
             row.n_number: (
                 str(row.faa_manufacturer),

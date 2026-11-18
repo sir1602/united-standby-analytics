@@ -82,7 +82,7 @@ def test_ingest_faa_handles_bom_commercial_filter_and_dereg_dedup(
     # - 884AS (EA Vision drone in MASTER vs CRJ-200 in DEREG) keeps only CRJ-200 DEREG when commercial_only=True
     # - 75432 (Boeing 737-924ER in MASTER vs Cessna AT-17 in DEREG) keeps only Boeing MASTER when commercial_only=True
     # - 54552 (Airbus A321-271NX in MASTER vs Boeing A75N1 Stearman in DEREG) preserves separate registry_source rows
-    # - 999TEST keeps the DEREG row with latest YYYYMMDD cancel_date
+    # - 999TEST keeps both DEREG rows, ordered latest YYYYMMDD cancel_date first
     faa_dir = tmp_path / "faa"
     faa_dir.mkdir(parents=True)
     (faa_dir / "ACFTREF.txt").write_text(
@@ -122,8 +122,11 @@ def test_ingest_faa_handles_bom_commercial_filter_and_dereg_dedup(
     assert "151GJ" not in comm_master
     assert "884AS" not in comm_master
     assert "75432" not in comm_dereg
-    assert syn_comm.loc[syn_comm["n_number"] == "999TEST", "serial_number"].iloc[0] == "S2"
-    assert syn_comm.loc[syn_comm["n_number"] == "999TEST", "cancel_date"].iloc[0] == "20220515"
+    # DEREG keeps every record (latest cancel_date first); the per-tail choice is made after the
+    # seat floor in AircraftResolver / int_aircraft_enriched.
+    rows_999 = syn_comm.loc[syn_comm["n_number"] == "999TEST"]
+    assert rows_999["serial_number"].tolist() == ["S2", "S1"]
+    assert rows_999["cancel_date"].tolist() == ["20220515", "20100101"]
 
     syn_all = ingest_faa_registry(tmp_path, commercial_only=False)
     all_master = set(syn_all.loc[syn_all["registry_source"] == "faa_master", "n_number"])
@@ -141,6 +144,35 @@ def test_ingest_tsa_parses_dates_and_filters_years(sample_dir: Path) -> None:
     df_2024 = ingest_tsa(sample_dir, years=[2024])
     assert len(df_2024) == 31
     assert df_2024["date_day"].str.startswith("2024-").all()
+
+
+def test_tsa_duplicate_dates_keep_max_throughput_like_dbt(tmp_path: Path) -> None:
+    """Conflicting duplicate TSA dates keep the highest throughput (parity with dbt `stg_tsa_throughput`)."""
+    from standby.enrichment.calculations import compute_tsa_daily_multipliers
+
+    tsa_dir = tmp_path / "tsa"
+    tsa_dir.mkdir()
+    (tsa_dir / "tsa_checkpoint_volumes.csv").write_text(
+        "date,tsa_throughput,source_page_year\n"
+        "2024-01-15,1500000,2024\n"
+        "2024-01-15,2000000,2025\n"
+        "2024-01-16,1000000,2024\n",
+        encoding="utf-8",
+    )
+    ingested = ingest_tsa(tmp_path, years=[2024])
+    assert ingested["date_day"].tolist() == ["2024-01-15", "2024-01-16"]
+    assert ingested["tsa_throughput"].tolist() == [2_000_000, 1_000_000]
+
+    # The multiplier step applies the same rule regardless of input order
+    raw_dups = pd.DataFrame(
+        {
+            "date_day": ["2024-01-15", "2024-01-16", "2024-01-15"],
+            "tsa_throughput": [1_500_000, 1_000_000, 2_000_000],
+        }
+    )
+    mults = compute_tsa_daily_multipliers(raw_dups, alpha=0.35, bounds=(0.80, 1.20))
+    by_day = dict(zip(mults["date_day"], mults["tsa_throughput"], strict=True))
+    assert by_day == {"2024-01-15": 2_000_000, "2024-01-16": 1_000_000}
 
 
 def test_acquire_t100_and_tsa_protocols_mocked(tmp_path: Path, monkeypatch) -> None:

@@ -15,6 +15,7 @@ from google.auth.exceptions import DefaultCredentialsError
 from standby.cli import main
 from standby.config import StandbyConfig, load_config, parse_years_arg
 from standby.load.bigquery import (
+    BigQueryCredentialsError,
     build_load_job_config,
     infer_bigquery_schema,
     load_dataframe_to_bigquery,
@@ -86,27 +87,27 @@ def test_load_dataframe_to_bigquery_dry_run_and_live_mock_consistency(
     mock_job.result.assert_called_once()
 
 
-def test_load_dataframe_to_bigquery_no_credentials_fallback(
+def test_load_dataframe_to_bigquery_no_credentials_fails_fast(
     sample_ingested: dict[str, pd.DataFrame],
     sample_config: StandbyConfig,
+    tmp_path: Path,
     monkeypatch,
 ) -> None:
-    """Missing GCP credentials trigger local Parquet fallback with identical `flight_date` DATE metadata."""
+    """A live load without GCP credentials raises instead of writing Parquet and reporting success."""
     live_cfg = load_config(repo_root=sample_config.repo_root, sample_mode=True, dry_run=False)
-    live_cfg.processed_dir = sample_config.processed_dir
+    live_cfg.processed_dir = tmp_path / "processed"
 
     def _raise_no_creds(*args, **kwargs):
         raise DefaultCredentialsError("No ADC configured")
 
     monkeypatch.setattr("standby.load.bigquery.bigquery.Client", _raise_no_creds)
-    res = load_dataframe_to_bigquery(
-        sample_ingested["otp_marketing_flights"],
-        "otp_marketing_flights",
-        live_cfg,
-    )
-    assert res.mode == "local_fallback_no_credentials"
-    assert res.partition_field == "flight_date"
-    assert res.local_artifact_path is not None and res.local_artifact_path.is_file()
+    with pytest.raises(BigQueryCredentialsError, match="--dry-run"):
+        load_dataframe_to_bigquery(
+            sample_ingested["otp_marketing_flights"],
+            "otp_marketing_flights",
+            live_cfg,
+        )
+    assert not list(live_cfg.processed_dir.rglob("*.parquet"))
 
 
 def test_cli_verify_manifest_ingest_load_raw_and_run_sample(
