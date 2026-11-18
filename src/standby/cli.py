@@ -637,12 +637,21 @@ def validate_index_cmd(
     callback=_validate_years_option,
     help="Years to export (comma/range syntax, e.g. 2019,2023-2026; defaults to YAML config).",
 )
-@click.option("--sample", is_flag=True, default=False, help="Export data/sample/ for fast CI.")
+@click.option(
+    "--sample",
+    is_flag=True,
+    default=False,
+    help="Export data/sample/ for fast CI (writes to gitignored `data/processed/sample/tableau/`).",
+)
 @click.option(
     "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help="Output directory for Tableau CSV extracts (defaults to `exports/tableau`).",
+    help=(
+        "Output directory for Tableau CSV extracts (defaults to `exports/tableau`; "
+        "`--sample` runs default to `data/processed/sample/tableau` and `--flight-mode full` "
+        "runs to `exports/tableau/full`, both gitignored)."
+    ),
 )
 @click.option(
     "--flight-mode",
@@ -652,7 +661,7 @@ def validate_index_cmd(
 )
 @click.option(
     "--max-flight-rows",
-    type=int,
+    type=click.IntRange(min=1),
     default=None,
     help="Maximum rows for stratified/recent-12m `fct_flights_tableau.csv` (defaults to 100,000).",
 )
