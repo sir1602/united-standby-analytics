@@ -47,10 +47,10 @@ jobs:
           .venv/bin/python -m standby export-looker --hub ORD --years 2019,2023-2026 --sample
 
       - name: Validate dbt project (offline parse)
-        run: .venv/bin/dbt parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+        run: .venv/bin/dbt parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
 
       - name: Validate dbt SQL compilation (offline compile)
-        run: .venv/bin/dbt compile --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+        run: .venv/bin/dbt compile --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
 
       - name: Generate dbt catalog docs (offline empty-catalog)
-        run: .venv/bin/dbt docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
+        run: .venv/bin/dbt docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache

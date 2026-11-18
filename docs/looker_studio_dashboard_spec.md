@@ -26,9 +26,9 @@ Because dimensions (`dim_airport`, `dim_carrier`, `dim_aircraft`, `dim_date`) ar
 3. Verify the semantic field types listed in Section 2 below, then click **Connect**.
 
 ### Option B — Live BigQuery Connection (`marts.*`)
-If you have loaded the warehouse into **BigQuery Sandbox** or a GCP project (`united-standby-analytics`):
+If you have loaded the warehouse into **BigQuery Sandbox** or a GCP project (`flight-standby-analytics` by default; see `docs/bigquery_optimization.md` §7):
 1. In Looker Studio, click **Create** → **Data source** → **BigQuery**.
-2. Select project `united-standby-analytics` → dataset `marts` → connect `fct_flights` (all `830,941` flights, DAY-partitioned on `flight_date` and clustered by `origin, dest, op_carrier`) and `agg_route_month` (`20,877` route-months).
+2. Select project `flight-standby-analytics` → dataset `marts` → connect `fct_flights` (all `830,941` flights, DAY-partitioned on `flight_date` and clustered by `origin, dest, op_carrier`) and `agg_route_month` (`20,877` route-months).
 
 ---
 

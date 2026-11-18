@@ -6,7 +6,7 @@ sources:
       Raw standardized tables batch-loaded into BigQuery by `python -m standby`
       (`load-raw` or `run`) with explicit schemas, DAY partitioning on `otp_marketing_flights.flight_date`,
       and `NONE` partition expiration (D-08).
-    database: "{{ env_var('GCP_PROJECT_ID', 'united-standby-analytics') }}"
+    database: "{{ env_var('GCP_PROJECT_ID', 'flight-standby-analytics') }}"
     schema: raw
     tables:
       - name: otp_marketing_flights

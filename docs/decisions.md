@@ -1,10 +1,10 @@
 # Technical Decisions & Assumptions Log (`docs/decisions.md`)
 
-Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**, the **6 Phase 4 Standby Opportunity Index & validation decisions (`D-29` through `D-34`)**, and the **4 Phase 5 Tableau delivery & documentation decisions (`D-35` through `D-38`)**.
+Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technical decision and assumption in `docs/decisions.md`"*), this document records the **13 baseline architectural decisions (`D-01` through `D-13`)**, the **5 Phase 0 empirical technical decisions (`D-14` through `D-18`)**, the **5 Phase 2 enrichment decisions (`D-19` through `D-23`)**, the **5 Phase 3 dbt modeling decisions (`D-24` through `D-28`)**, the **6 Phase 4 Standby Opportunity Index & validation decisions (`D-29` through `D-34`)**, the **4 Phase 5 Tableau delivery & documentation decisions (`D-35` through `D-38`)**, and the **live warehouse setup decision (`D-39`)**.
 
 ---
 
-## Summary Table (`D-01` – `D-38`)
+## Summary Table (`D-01` – `D-39`)
 
 | ID | Category | Decision Title | Choice Made | Status |
 |---|---|---|---|---|
@@ -46,10 +46,11 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 | **D-36** | Geospatial BI (Phase 5) | Built-In Tableau `Airport` Geo Role via `route_map_paths.csv` | Export 2-point `route_map_paths.csv` (`path_order` 1=`ORD`, 2=`dest`, excluding `ORD -> ORD` ferry loops) using Tableau's built-in `Airport` geographic role with zero invented coordinates | Phase 5 Tableau & Docs |
 | **D-37** | BI Modeling (Phase 5) | Parsed `dim_airport` City/Region & International `agg_route_month` Null Boundary | Parse `city_name` and `state_or_country` from `L_AIRPORT` in `dim_airport.csv` while preserving `otp_* = NULL` and `data_granularity = 'route_month_only_v1'` on international segments | Phase 5 Tableau & Docs |
 | **D-38** | Quality & Docs (Phase 5) | Post-Export Invariant Gate & 157-Column Confidence-Tiered Data Dictionary | Block `export-tableau` on non-empty CSVs, unique PKs, `SC-5`, `[0,1]`/`[0,100]` bounds, zero PII, and `< 50 MB` file size; document all `157` BigQuery mart columns (`actual`/`derived`/`estimated`) | Phase 5 Tableau & Docs |
+| **D-39** | Warehouse (Live) | Live Project `flight-standby-analytics` & `GCP_PROJECT_ID` Override | Point `config/standby.yaml` and the dbt profile/source defaults at the live billing-enabled project; `GCP_PROJECT_ID` overrides both. Offline dbt commands run with `--no-populate-cache` so they never call BigQuery | Live Warehouse Setup |
 
 ---
 
-## Detailed Decision Records (`D-01` – `D-38`)
+## Detailed Decision Records (`D-01` – `D-39`)
 
 ### D-01: Target Standby Traveler Type (`Employee / Non-Rev Standby`)
 - **Context:** Airline standby lists include both revenue standbys (same-day changes, missed connections, Premier upgrades) and non-revenue employee/pass-rider standbys (`SA`), who board only after every revenue and IRROPS-reaccommodated passenger is seated.
@@ -285,5 +286,11 @@ Per Ground Rule #2 (`ORIGINAL_REQUEST.md` §11, Line 180: *"Record every technic
 - **Decision:** Gate `export_tableau_extracts()` on automated post-export validation (non-empty CSVs, unique PKs, `SC-5` null invariant on unmatched T-100 rows, `[0, 1]` LF & `[0, 100]` SOI bounds, zero forbidden PII columns, and `< 50 MB` file cap) and document all `157` BigQuery mart columns (`actual`/`derived`/`estimated`) in `docs/data_dictionary.md`.
 - **Rationale & Implications:** Guarantees every published extract and documentation table reconciles 1:1 with the dbt marts (`dbt/models/marts/`) and Python validation outputs.
 
+---
 
+## Live Warehouse Setup (`D-39`)
 
+### D-39: Live Project `flight-standby-analytics`, `GCP_PROJECT_ID` Override & Offline-Only dbt Compilation
+- **Context:** `config/standby.yaml` and `dbt/profiles.yml` defaulted to a placeholder project ID (`united-standby-analytics`) that does not exist. The live warehouse lives in the billing-enabled project `flight-standby-analytics`. The Python loader read the project only from YAML, while dbt read `GCP_PROJECT_ID`, so the two could target different projects. Offline `dbt compile` also passed only because the placeholder project returned 404 during cache population. Against a real project, the placeholder CI token gets a 401, and `dbt compile` fails with a `RefreshError`.
+- **Decision:** Set `bigquery.project_id: flight-standby-analytics` and use it as the default in `dbt/profiles.yml` and `dbt/models/staging/_sources.yml`. Let `GCP_PROJECT_ID` override the YAML value in `load_config()` so that one variable steers both the loader and dbt. Add `--no-populate-cache` to the offline `dbt parse`/`compile`/`docs generate` calls in the Makefile, the CI workflow and the dbt test fixture. Add `make bq-load` and `make dbt-build` for the live path; they are kept out of `make all`.
+- **Rationale & Implications:** CI stays fully offline and deterministic whichever project ID is configured. Pointing the pipeline at another project means setting one environment variable, with no code or YAML edits. The current contents of the live warehouse (the sample slice) and how they were verified are recorded in `docs/bigquery_optimization.md` §7.
