@@ -212,31 +212,40 @@ ORDER BY t100_load_factor ASC, departures_performed DESC;
 
 ## 7. Live Warehouse: `flight-standby-analytics`
 
-**Status (2026-11-18): set up and loaded with the committed sample slice, not the full dataset.**
+**Status (2026-11-18): loaded with the full dataset (830,941 flights).** This replaces the earlier `data/sample/` load (80 flights).
 
 | Item | State |
 |---|---|
 | GCP project | `flight-standby-analytics` (billing enabled; datasets show no Sandbox-imposed 60-day default expiration) |
 | Datasets | `raw`, `staging`, `intermediate`, `marts`, all in `US`, no default table or partition expiration |
-| `raw` tables | `otp_marketing_flights` (80 rows; `DAY`-partitioned on `flight_date`, clustered by `origin, dest, op_carrier`), `t100_segments` (1,472), `bts_lookups` (810), `faa_acftref` (19), `faa_aircraft_registry` (17), `tsa_daily_throughput` (62), plus the dbt seeds `seat_config` (31), `tail_overrides` (152), `faa_t100_crosswalk` (56) |
+| `raw` tables | `otp_marketing_flights` (830,941 rows; `DAY`-partitioned on `flight_date`, clustered by `origin, dest, op_carrier`), `t100_segments` (75,863; `ORD`, `CLASS='F'`), `bts_lookups` (18,170), `faa_acftref` (94,220), `faa_aircraft_registry` (31,671 commercial airliners: 16,145 `MASTER` + 15,526 `DEREG`), `tsa_daily_throughput` (1,782), plus the dbt seeds `seat_config` (31), `tail_overrides` (152), `faa_t100_crosswalk` (56) |
 | `staging` / `intermediate` | All 8 staging and 5 intermediate dbt models, as views |
-| `marts` | `fct_flights` (80 rows; `DAY`-partitioned on `flight_date`, clustered by `origin, dest, op_carrier`), `agg_route_month`, `dim_aircraft`, `dim_airport`, `dim_carrier`, `dim_date`, as tables |
+| `marts` | `fct_flights` (830,941 rows; 1,704 daily partitions from `2019-01-01` to `2026-08-31`, clustered by `origin, dest, op_carrier`), `agg_route_month` (20,877), `dim_aircraft` (1,908), `dim_airport` (349), `dim_carrier` (9), `dim_date` (1,782), as tables |
+| Storage | About 0.9 GiB across `raw` + `marts` (`raw.otp_marketing_flights` 425 MiB, `marts.fct_flights` 469 MiB), inside the 10 GiB free tier |
 
-### How the sample was loaded
+### How the full dataset was loaded
 
-The cloud session that set this up had no direct GCP credentials, only a SQL-capable BigQuery connector. So the load ran as SQL instead of through `standby run` and `dbt build`:
+The load ran through the documented live path (`make bq-load` then `make dbt-build`), from a workstation with Application Default Credentials (`gcloud auth application-default login`):
 
-1. `python -m standby load-raw --sample --dry-run` produced the raw tables. Each table's schema, partitioning and clustering came from `standby.load.bigquery.build_load_job_config`, the same function the live loader uses. The rows were inserted with `CREATE TABLE` + `INSERT`. The OTP table therefore has the 31-column `load-raw` shape, which `stg_otp_flights` reads identically to the enriched `run` shape.
-2. The dbt seeds were loaded into `raw` using the `+column_types` declared in `dbt/dbt_project.yml`.
-3. Every model was built from dbt's own compiled SQL (`dbt compile`), in dependency order. Views and tables follow each model's `materialized`, `partition_by` and `cluster_by` config.
+1. All raw sources were downloaded per [`docs/data_acquisition.md`](data_acquisition.md). The pipeline then ran without `--dry-run`: `python -m standby run --hub ORD --years 2019,2023-2026` (`WRITE_TRUNCATE` into `raw.*`, 3 min 41 s).
+2. `dbt build --target dev` built the seeds, views and marts, and ran every test (6 min 4 s).
+
+**Manifest drift.** `standby run` only accepts files that match `data/manifest.csv` exactly. All 66 BTS files (56 OTP months, 5 T-100 years, 5 lookups) matched on checksum and row count. Two sources had changed upstream since the manifest was written on 2026-11-13:
+
+- **FAA registry:** FAA republishes `ReleasableAircraft.zip` daily. The files used were `MASTER` 319,451 rows (manifest: 319,135), `DEREG` 383,780 (383,757) and `ACFTREF` 94,220 (94,210).
+- **TSA checkpoint volumes:** the current-year page had gained days since 2026-11-12, so the table covers 1,782 days (`2019` + `2023-01-01..2026-11-17`) against 1,777 in the manifest. `tsa.gov` also returned `403 Forbidden` to the scripted downloader, so the five pages were read in a browser, and each page's total was checked against the site's own sum before the CSV was written.
+
+For this run, the loader pointed `paths.manifest_path` at an untracked local manifest built from the files as downloaded. The committed `data/manifest.csv` and `config/standby.yaml` are unchanged.
 
 ### Verification
 
-- **Raw layer:** all 108 per-column aggregates match the local source frames exactly (row counts, non-null counts, numeric sums, MD5-sum fingerprints of string and date columns) across all 9 raw tables.
-- **SOI parity:** `marts.fct_flights` matches the Python pipeline's scored output for the same sample on 24 metrics, within 1e-9 relative tolerance. These are flight-ID-hash-weighted sums of `soi_historical`, `soi_planning`, all 8 sub-scores, load factors, open seats, `seats_config`, displacement, backups and TSA ratio, plus the `lf_source`, `aircraft_source`, `seat_config_source`, `fleet_subtype` and `hour_block` distributions. Counts: 70 `soi_historical` and 20 `soi_planning` scored, as in Python.
-- **dbt tests:** all **231 of 231** tests in the project pass against the live warehouse, with 0 failing rows. That covers 117 `not_null`, 57 `accepted_range`, 21 `unique`, 12 `accepted_values`, 10 `relationships`, 7 `not_null_where` and 3 `unique_combination_of_columns`, plus the 4 singular tests (`fct_flights` grain, `SC-1` passenger bounds, `SC-5` no silent T-100 imputation, SOI leakage & bounds). Each test ran its exact dbt-compiled SQL.
+- **Row counts:** `raw.otp_marketing_flights` and `marts.fct_flights` both hold exactly **830,941** flights, matching the Phase 0 count. `marts.fct_flights` scores 814,847 `soi_historical` and 626,838 `soi_planning` flights, the same counts as the Python pipeline.
+- **dbt build:** `PASS=253 WARN=0 ERROR=0 SKIP=0`. That is 231 data tests (generic tests plus the 4 singular tests: `fct_flights` grain, `SC-1` passenger bounds, `SC-5` no silent T-100 imputation, SOI leakage & bounds), 3 seeds, 13 views and 6 tables.
+- **Section 7 sanity checks:** passed. Every performed flight resolved to an aircraft. The overall UA load factor is 82.9%. Mainline and dedicated-express departures reconcile with T-100 within about 0.4% overall. One warning was raised: 87 individual dedicated-express route-months differ from T-100 by more than 10%.
 
-### Loading the full dataset
+The earlier sample load (80 flights, built from dbt-compiled SQL through a SQL-only connector) matched the Python pipeline on 108 raw-layer aggregates and 24 SOI parity metrics. That parity check was not repeated at full scale.
+
+### Reloading
 
 Run these from a machine with Application Default Credentials for the project, and with `data/raw/` populated per [`docs/data_acquisition.md`](data_acquisition.md):
 
@@ -246,4 +255,4 @@ make bq-load     # standby run without --dry-run: WRITE_TRUNCATE loads into raw.
 make dbt-build   # dbt seed + run + test against the dev target (oauth / ADC)
 ```
 
-`make bq-load` replaces each raw table, and `make dbt-build` recreates the seeds, views and marts. Nothing from the sample load needs to be removed first. Set `GCP_PROJECT_ID` to point both the loader and dbt at a different project.
+`make bq-load` replaces each raw table, and `make dbt-build` recreates the seeds, views and marts, so nothing needs to be removed first. Expect the FAA and TSA checksums to drift from `data/manifest.csv` between refreshes (see above). `make bq-load SAMPLE=1` loads the committed sample slice instead. Set `GCP_PROJECT_ID` to point both the loader and dbt at a different project.
