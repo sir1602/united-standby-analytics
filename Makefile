@@ -50,6 +50,6 @@ dbt-docs:
 	$(DBT) docs generate --empty-catalog --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats
 
 run:
-	$(PYTHON) -m standby run --hub ORD --years 2019,2023-2026
+	$(PYTHON) -m standby run --hub ORD --years 2019,2023-2026 --dry-run
 
 all: lint format-check test dbt-parse dbt-compile dbt-docs run
