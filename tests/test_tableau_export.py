@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -459,6 +460,9 @@ def test_phase5_docs_exist_and_cover_157_mart_columns(repo_root: Path) -> None:
         "MAKELINE",
     ):
         assert required_spec in spec_text, f"Missing {required_spec!r} in tableau_dashboard_spec.md"
+    # Previously published KPI figures that were wrong must not come back.
+    assert "Median Open Seats (Adj): 19.2" not in spec_text
+    assert "3.4 flts" not in spec_text
 
     # 3. BigQuery optimization: Sandbox rationale, unpartitioned vs pruned SQL, bq query --dry_run, zero fake bytes
     bq_text = bq_path.read_text(encoding="utf-8")
@@ -510,6 +514,39 @@ def test_default_output_dirs_never_target_committed_exports(
     assert res.output_dir == (isolated_cfg.processed_dir / "sample" / "tableau").resolve()
     assert (res.output_dir / "fct_flights_tableau.csv").is_file()
     assert not isolated_cfg.exports_dir.exists()
+
+
+def test_unlisted_other_mode_flight_file_is_kept(
+    sample_config: StandbyConfig,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A `_full.csv` the previous export did not write (e.g. from an older version) is kept."""
+    # Earlier CLI tests run `configure_logging`, which stops `standby` logs reaching caplog.
+    monkeypatch.setattr(logging.getLogger("standby"), "propagate", True)
+    out_dir = tmp_path / "legacy"
+    out_dir.mkdir()
+    legacy_text = "flight_id\nlegacy-full-run\n"
+    (out_dir / "fct_flights_tableau_full.csv").write_text(legacy_text, encoding="utf-8")
+    (out_dir / "export_metadata.json").write_text(
+        json.dumps({"files": {"fct_flights_tableau.csv": {}}}) + "\n", encoding="utf-8"
+    )
+
+    with caplog.at_level("WARNING", logger="standby.export.tableau"):
+        export_tableau_extracts(
+            config=sample_config,
+            output_dir=out_dir,
+            flight_mode="stratified",
+            from_processed=False,
+        )
+
+    legacy = out_dir / "fct_flights_tableau_full.csv"
+    assert legacy.read_text(encoding="utf-8") == legacy_text
+    assert "Keeping fct_flights_tableau_full.csv" in caplog.text
+    meta = json.loads((out_dir / "export_metadata.json").read_text(encoding="utf-8"))
+    assert "fct_flights_tableau_full.csv" not in meta["files"]
+    assert (out_dir / "fct_flights_tableau.csv").is_file()
 
 
 def test_failed_validation_leaves_existing_exports_untouched(

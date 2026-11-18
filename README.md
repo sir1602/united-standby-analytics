@@ -246,3 +246,5 @@ make export-tableau
 .venv/bin/python -m standby export-tableau --flight-mode recent-12m
 .venv/bin/python -m standby export-tableau --flight-mode full
 ```
+
+Switching flight modes in one output directory removes the other mode's flight file only if the previous export there wrote it (it is listed in that directory's `export_metadata.json`); any other file, such as a `fct_flights_tableau_full.csv` left in `exports/tableau/` by an older version, is kept with a warning. Pointing `--output-dir exports/tableau` at a `--sample` or `--flight-mode full` run replaces the committed extracts; restore them with `git checkout -- exports/tableau`.

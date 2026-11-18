@@ -265,6 +265,16 @@ def _flight_filename(flight_mode: str) -> str:
     return "fct_flights_tableau_full.csv" if flight_mode == "full" else "fct_flights_tableau.csv"
 
 
+def _files_listed_in_metadata(metadata_path: Path) -> set[str]:
+    """File names listed in an existing `export_metadata.json` (empty if missing or unreadable)."""
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    files = payload.get("files") if isinstance(payload, dict) else None
+    return {str(name) for name in files} if isinstance(files, dict) else set()
+
+
 def _resolve_default_output_dir(config: StandbyConfig, flight_mode: str) -> Path:
     """
     Default output directory that never overwrites the committed `exports/tableau/` extracts.
@@ -1587,23 +1597,36 @@ def export_tableau_extracts(
         staged_metadata = staging_dir / "export_metadata.json"
         staged_metadata.write_text(json.dumps(metadata_payload, indent=2) + "\n", encoding="utf-8")
 
-        # Publish: drop the old metadata first so an interrupted publish never leaves metadata
-        # vouching for files it no longer matches, then move CSVs, then write metadata last.
+        # Publish: note which files the previous export here wrote, drop the old metadata so an
+        # interrupted publish never leaves metadata vouching for files it no longer matches,
+        # then move CSVs, then write metadata last.
+        previous_files = _files_listed_in_metadata(metadata_path)
         metadata_path.unlink(missing_ok=True)
         for fname, fpath in staged_paths.items():
             os.replace(fpath, resolved_out_dir / fname)
 
-        # A flight extract from the other mode would belong to a different run and is not
-        # described by the new metadata, so remove it to keep the directory one consistent run.
+        # The other mode's flight extract is not described by the new metadata. Remove it only
+        # when the previous export in this directory wrote it (listed in its metadata); keep any
+        # file the exporter cannot vouch for, such as a `_full.csv` left by an older version.
         other_mode = "stratified" if resolved_mode == "full" else "full"
         stale_flight_path = resolved_out_dir / _flight_filename(other_mode)
         if stale_flight_path.exists():
-            logger.warning(
-                "Removing stale %s from a previous %s-mode run (not part of this export)",
-                stale_flight_path.name,
-                other_mode,
-            )
-            stale_flight_path.unlink()
+            if stale_flight_path.name in previous_files:
+                logger.warning(
+                    "Removing %s written by the previous export in %s (not part of this %s-mode "
+                    "export)",
+                    stale_flight_path.name,
+                    resolved_out_dir,
+                    resolved_mode,
+                )
+                stale_flight_path.unlink()
+            else:
+                logger.warning(
+                    "Keeping %s in %s: the previous export_metadata.json does not list it, so it "
+                    "was not written by the last export here; it is not part of this export",
+                    stale_flight_path.name,
+                    resolved_out_dir,
+                )
 
         os.replace(staged_metadata, metadata_path)
     finally:
