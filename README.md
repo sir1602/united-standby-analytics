@@ -36,7 +36,7 @@ flowchart LR
         ING["Ingest & Pandera<br/>(ingest/ + schemas/)"]
         ENR["3-Tier Enrichment + SC-1..SC-5<br/>(enrichment/ + validation/sanity.py)"]
         SOI["Dual-Variant SOI & Validation<br/>(scoring/ + validation/soi_validation.py)"]
-        EXP["Tableau CSV Exporter<br/>(export/tableau.py)"]
+        EXP["Tableau & Looker Exporters<br/>(export/tableau.py & export/looker.py)"]
     end
 
     subgraph WH["BigQuery Warehouse & dbt Core (dbt/)"]
@@ -45,8 +45,8 @@ flowchart LR
         DBT_MRT["marts.* (157 columns)<br/>fct_flights | agg_route_month | 4 dims"]
     end
 
-    subgraph BI["Tableau Public Extracts (exports/tableau/)"]
-        CSV["8 BI CSVs (34.91 MiB total)<br/>+ export_metadata.json"]
+    subgraph BI["Dual BI Extracts (exports/)"]
+        CSV["Tableau: 8 Star-Schema CSVs (34.91 MiB)<br/>Looker Studio: 4 Pre-Joined CSVs (53.91 MiB)"]
     end
 
     Raw --> ING --> ENR --> SOI
@@ -123,11 +123,22 @@ Full warehouse design, billing rules, and benchmark queries are documented in [`
 
 ---
 
-## Tableau Public Dashboard: "United Standby Opportunity Explorer"
+## BI Dashboards: Tableau Public & Google Looker Studio
 
+This repository provides **two zero-cost BI delivery paths** from the same validated pipeline:
+
+### 1. Tableau Public Dashboard: "United Standby Opportunity Explorer"
 - **Tableau Public Link:** *(Pending user workbook publish — build from [`exports/tableau/`](exports/tableau/) following [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) §6 Publishing Checklist and replace this placeholder URL once published)*
 - **Screenshot Preview:** `<!-- Add exported dashboard PNG screenshot at docs/assets/tableau_dashboard_preview.png once published to Tableau Public -->`
-- **Deliverables:** `8` validated CSV extracts (`34.91 MiB` total, `< 50 MB` Git-safe; `fct_flights_tableau.csv` = `100,000` stratified rows across all 56 months & 9 carriers, `agg_route_month.csv` = `20,877` domestic + international route-months, `route_map_paths.csv` = `696` `ORD`-spoke path points using Tableau's built-in `Airport` geo role) + [`exports/tableau/export_metadata.json`](exports/tableau/export_metadata.json) + `22` copy-paste Tableau calculated fields in [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md).
+- **Deliverables (`exports/tableau/`):** `8` star-schema CSV extracts (`34.91 MiB` total, `< 50 MB` Git-safe; `fct_flights_tableau.csv` = `100,000` stratified rows across all 56 months & 9 carriers, `agg_route_month.csv` = `20,877` domestic + international route-months, `route_map_paths.csv` = `696` `ORD`-spoke path points using Tableau's built-in `Airport` geo role) + [`exports/tableau/export_metadata.json`](exports/tableau/export_metadata.json) + `22` copy-paste Tableau calculated fields in [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md).
+
+### 2. Google Looker Studio Dashboard (Zero-Blend Pre-Joined CSVs or Live BigQuery)
+- **Specification & Setup Guide:** [`docs/looker_studio_dashboard_spec.md`](docs/looker_studio_dashboard_spec.md)
+- **Deliverables (`exports/looker/`):** `4` pre-joined (denormalized) CSV extracts (`53.91 MiB` total, `< 50 MiB` per file) requiring **zero Data Blends** in Looker Studio's native File Upload connector:
+  - [`exports/looker/looker_flights.csv`](exports/looker/looker_flights.csv) (`100,000` rows × `67` cols, `46.68 MiB`): `fct_flights_tableau` pre-joined with carrier, destination city/country, FAA aircraft model, chronological `day_of_week_label` (`1 - Mon`..`7 - Sun`), `hour_block_label` (`1 - Early`..`6 - Late`), and SOI tier labels.
+  - [`exports/looker/looker_route_month.csv`](exports/looker/looker_route_month.csv) (`20,877` rows × `42` cols, `7.14 MiB`): `agg_route_month` pre-joined with carrier metadata, destination Google Maps `dest_geo_query` (`Geo -> Address`), and domestic OTP SOI monthly rollups (`otp_avg_soi_historical`, `otp_avg_soi_planning`).
+  - [`exports/looker/looker_route_summary.csv`](exports/looker/looker_route_summary.csv) (`348` rows × `29` cols, `0.09 MiB`): 1 row per `(origin, dest, is_international)` route for Looker Studio's Google Maps Bubble Map and Destination Leaderboard.
+  - [`exports/looker/looker_validation_summary.csv`](exports/looker/looker_validation_summary.csv) (`45` rows × `7` cols) + [`exports/looker/export_metadata.json`](exports/looker/export_metadata.json).
 
 ```text
 +---------------------------------------------------------------------------------------------------+
@@ -164,11 +175,13 @@ Full warehouse design, billing rules, and benchmark queries are documented in [`
 | [`docs/phase0_validation_report.md`](docs/phase0_validation_report.md) | Phase 0 empirical inspection across all 5 raw sources (`35.88M` U.S. rows, Marketing vs. Reporting OTP proof, `DEREG.txt` lift, 6+3 data quirks, 11 limitations) |
 | [`docs/data_acquisition.md`](docs/data_acquisition.md) | Scripted & manual browser download instructions + SHA-256 `data/manifest.csv` contract |
 | [`docs/index_methodology.md`](docs/index_methodology.md) | Complete mathematical specification, leakage boundary matrix, and Section 6 empirical validation results (`docs/phase4_validation_summary.json`) |
-| [`docs/data_dictionary.md`](docs/data_dictionary.md) | Full column-level specification for all **`157` BigQuery mart columns** (`actual`/`derived`/`estimated`) + Tableau CSV projections |
+| [`docs/data_dictionary.md`](docs/data_dictionary.md) | Full column-level specification for all **`157` BigQuery mart columns** (`actual`/`derived`/`estimated`) + Tableau & Looker Studio CSV projections |
 | [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) | **"United Standby Opportunity Explorer"** Tableau Public wireframe, relationships, `22` calculated fields, `9` views, `6` filters, and `4` mandatory disclaimers |
+| [`docs/looker_studio_dashboard_spec.md`](docs/looker_studio_dashboard_spec.md) | **Google Looker Studio** 4-page build guide, zero-blend pre-joined CSV setup, Google Maps `dest_geo_query` config, and `SOI Mode` parameter formulas |
 | [`docs/bigquery_optimization.md`](docs/bigquery_optimization.md) | Billing-enabled BigQuery setup (`D-08`, why Sandbox's 60-day expiry fails), `DAY(flight_date)` partitioning, clustering, and unpartitioned vs. pruned `bq query --dry_run` SQL |
 | [`docs/decisions.md`](docs/decisions.md) | Full Technical Decisions & Assumptions Log (**`D-01` through `D-38`**) |
-| [`exports/tableau/`](exports/tableau/) | 8 validated BI CSV extracts (`34.91 MiB` total; `fct_flights_tableau.csv` stratified `100k` rows) + `export_metadata.json` |
+| [`exports/tableau/`](exports/tableau/) | 8 validated Tableau star-schema CSV extracts (`34.91 MiB` total; `fct_flights_tableau.csv` stratified `100k` rows) + `export_metadata.json` |
+| [`exports/looker/`](exports/looker/) | 4 validated Looker Studio pre-joined CSV extracts (`53.91 MiB` total; `looker_flights.csv` stratified `100k` rows) + `export_metadata.json` |
 | [`notebooks/00_phase0_validation.ipynb`](notebooks/00_phase0_validation.ipynb) | Executed Phase 0 EDA reproduction notebook |
 
 ---
@@ -182,8 +195,10 @@ united-standby-analytics/
 │   ├── raw/                 # Git-ignored raw BTS, FAA, and TSA archives (verified via data/manifest.csv)
 │   └── sample/              # Committed CI sample slice (13 files, verified via data/sample/manifest.csv)
 ├── dbt/                     # dbt Core BigQuery project (raw -> staging -> intermediate -> marts)
-├── docs/                    # Validation reports, methodology, 157-col data dictionary, Tableau & BQ specs
-├── exports/tableau/         # Committed BI CSV extracts (<50 MB per file) + export_metadata.json
+├── docs/                    # Validation reports, methodology, 157-col data dictionary, Tableau/Looker & BQ specs
+├── exports/
+│   ├── tableau/             # Committed Tableau star-schema CSV extracts (<50 MB per file) + export_metadata.json
+│   └── looker/              # Committed Looker Studio pre-joined CSV extracts (<50 MB per file) + export_metadata.json
 ├── notebooks/               # Executed Phase 0 EDA notebook
 ├── reference/               # Curated seat_config.csv (31), faa_t100_crosswalk.csv (56), tail_overrides.csv (152)
 ├── src/standby/             # Python CLI & package (ingest, manifest, schemas, enrichment, scoring, validation, export, load)
@@ -201,9 +216,7 @@ united-standby-analytics/
 | **Phase 2** | **PR #3** | Flight-Level Enrichment + Curated Reference Tables (`reference/`) + Section 7 Sanity Checks (*Stop Gate 2*) | **Merged (`main`)** |
 | **Phase 3** | **PR #4** | `dbt Core` (`staging` → `intermediate` → `marts`) + Zero-Dependency Schema Tests & Offline CI | **Merged (`main`)** |
 | **Phase 4** | **PR #5** | Standby Opportunity Index (`soi_historical` + `soi_planning`) + 3-Pillar Section 6 Validation Suite (*Stop Gate 3*) | **Merged (`main`)** |
-| **Phase 5** | [**PR #9**](https://github.com/sir1602/united-standby-analytics/pull/9) | Tableau Public Extracts (`exports/tableau/`) + Dashboard Spec + 157-Col Data Dictionary + BigQuery Guide + Final README | **Open (`phase-5-tableau-and-docs`)** |
-
-*(Note: Intermediate PRs `#6`–`#8` on GitHub were Phase 4 post-review bugfix/docs PRs from branch `claude/sharp-planck-0w5dly`, so the Phase 5 delivery PR is **PR #9**.)*
+| **Phase 5** | [**PR #9**](https://github.com/sir1602/united-standby-analytics/pull/9) | Tableau Public & Looker Studio Extracts (`exports/`) + Dashboard Specs + 157-Col Data Dictionary + BigQuery Guide + Final README | **Merged (`main`)** |
 
 ---
 
@@ -224,19 +237,21 @@ make dbt-parse
 make dbt-compile
 make dbt-docs
 
-# 4. Run end-to-end sample dry-run & Tableau sample export (<10s, zero GCP secrets required;
-#    sample extracts go to gitignored data/processed/sample/tableau/, never exports/tableau/)
+# 4. Run end-to-end sample dry-run & Tableau / Looker sample exports (<10s, zero GCP secrets required;
+#    sample extracts go to gitignored data/processed/sample/{tableau,looker}/, never exports/)
 make ingest-sample
 make score-sample
 make validate-index-sample
 make export-tableau-sample
+make export-looker-sample
 
-# 5. Run full 830,941-flight pipeline, Section 6 validation, and Tableau CSV export
+# 5. Run full 830,941-flight pipeline, Section 6 validation, and Tableau & Looker CSV exports
 #    (requires data/raw/ per docs/data_acquisition.md; `make run` is a --dry-run that writes
 #    local Parquet to gitignored data/processed/full/, so no GCP credentials are needed)
 make run
 make validate-index
 make export-tableau
+make export-looker
 
 # 6. Optional live BigQuery load: set bigquery.project_id in config/standby.yaml, authenticate
 #    with `gcloud auth application-default login`, then run without --dry-run
@@ -244,14 +259,15 @@ make export-tableau
 .venv/bin/python -m standby run --hub ORD --years 2019,2023-2026
 ```
 
-### CLI Options for `export-tableau`
+### CLI Options for `export-tableau` & `export-looker`
 ```bash
 # Default: 100,000-row stratified sample across (year, month, op_carrier), seed=42 (<50 MB Git-safe)
 .venv/bin/python -m standby export-tableau --hub ORD --years 2019,2023-2026
+.venv/bin/python -m standby export-looker --hub ORD --years 2019,2023-2026
 
-# Recent 12 months slice (or full 830,941-row local extract written to gitignored exports/tableau/full/)
+# Recent 12 months slice (or full 830,941-row local extract written to gitignored exports/{tableau,looker}/full/)
 .venv/bin/python -m standby export-tableau --flight-mode recent-12m
-.venv/bin/python -m standby export-tableau --flight-mode full
+.venv/bin/python -m standby export-looker --flight-mode recent-12m
 ```
 
-Switching flight modes in one output directory removes the other mode's flight file only if the previous export there wrote it (it is listed in that directory's `export_metadata.json`); any other file, such as a `fct_flights_tableau_full.csv` left in `exports/tableau/` by an older version, is kept with a warning. Pointing `--output-dir exports/tableau` at a `--sample` or `--flight-mode full` run replaces the committed extracts; restore them with `git checkout -- exports/tableau`.
+Switching flight modes in one output directory removes the other mode's flight file only if the previous export there wrote it (it is listed in that directory's `export_metadata.json`); any other file, such as a `fct_flights_tableau_full.csv` left in `exports/tableau/` by an older version, is kept with a warning. Pointing `--output-dir exports/tableau` (or `exports/looker`) at a `--sample` or `--flight-mode full` run replaces the committed extracts; restore them with `git checkout -- exports/tableau exports/looker`.
