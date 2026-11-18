@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -295,8 +296,13 @@ def load_config(
             load_multiplier=float(spec_dict["load_multiplier"]),
         )
 
+    # `GCP_PROJECT_ID` overrides the YAML project so the Python loader and dbt
+    # (`dbt/profiles.yml` reads the same env var) always target one project.
+    bq_project_id = os.environ.get("GCP_PROJECT_ID", "").strip() or str(
+        bq_raw.get("project_id", "flight-standby-analytics")
+    )
     bq_config = BigQueryConfig(
-        project_id=str(bq_raw.get("project_id", "united-standby-analytics")),
+        project_id=bq_project_id,
         location=str(bq_raw.get("location", "US")),
         partition_expiration_ms=bq_raw.get("partition_expiration_ms", None),
         datasets=dict(bq_raw.get("datasets", {})),

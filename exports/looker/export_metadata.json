@@ -1,0 +1,46 @@
+{
+  "bi_target": "looker_studio",
+  "generated_at_utc": "2026-11-18T19:43:33Z",
+  "hub": "ORD",
+  "years": [
+    2019,
+    2023,
+    2024,
+    2025,
+    2026
+  ],
+  "sample_mode": false,
+  "flight_mode": "stratified",
+  "flight_row_budget": 100000,
+  "stratify_seed": 42,
+  "float_precision": 4,
+  "total_source_flights": 830941,
+  "exported_flights": 100000,
+  "invariants_passed": true,
+  "files": {
+    "looker_flights.csv": {
+      "rows": 100000,
+      "columns": 67,
+      "bytes": 48947197,
+      "sha256": "08825356ddaab8ba3807ce6da296a50f37c544ee01404069be798fb768dcbc28"
+    },
+    "looker_route_month.csv": {
+      "rows": 20877,
+      "columns": 42,
+      "bytes": 7482202,
+      "sha256": "380c9add5d35ea1e6a55ffc5c73647019e241ccddc187b20800a06cbc575a8e5"
+    },
+    "looker_route_summary.csv": {
+      "rows": 348,
+      "columns": 29,
+      "bytes": 95688,
+      "sha256": "d19df8dea2504ef4990a565d00f88d3a00ddf42c682859bf73b7ce851548e814"
+    },
+    "looker_validation_summary.csv": {
+      "rows": 45,
+      "columns": 7,
+      "bytes": 6132,
+      "sha256": "1ab4cc411d3ca0628a95c953ea09845d5c9a4b0b85d9c612896caebf37507db6"
+    }
+  }
+}

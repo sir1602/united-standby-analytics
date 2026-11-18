@@ -51,7 +51,7 @@ index_weights:
   day_holiday_demand: 0.10
 
 bigquery:
-  project_id: united-standby-analytics
+  project_id: flight-standby-analytics  # override with the GCP_PROJECT_ID env var (also read by dbt)
   location: US
   partition_expiration_ms: null  # Strictly NONE (billing-enabled project, never Sandbox)
   datasets:
