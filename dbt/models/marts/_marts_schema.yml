@@ -263,6 +263,107 @@ models:
               min_value: 0.0
               max_value: 1.0
 
+  - name: agg_predictor_priors
+    description: >
+      Hierarchical Empirical Bayes predictor priors mart mirroring `src/standby/prediction/priors.py`.
+      Exposes domestic route x month x DOW x hour_block priors (Tiers 1-3) alongside international
+      T-100 route x month priors (`TIER3_INTL_T100_V1`, `data_granularity = 'route_month_only_v1'`).
+    columns:
+      - name: prior_id
+        description: "Deterministic primary key (prior_tier|origin|dest|MM|DOW_or_ALL|hour_block_or_ALL)."
+        data_tests:
+          - unique
+          - not_null
+      - name: prior_tier
+        description: "Hierarchical shrinkage tier identifier."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values:
+                - "TIER1_ROUTE_MONTH_DOW_HB"
+                - "TIER2_ROUTE_MONTH_HB"
+                - "TIER3_ROUTE_MONTH"
+                - "TIER3_INTL_T100_V1"
+      - name: origin
+        description: "Origin hub IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: dest
+        description: "Destination airport IATA code. FK to dim_airport."
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_airport')
+              field: airport_code
+      - name: month
+        description: "Calendar month (1-12)."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+              max_value: 12
+      - name: day_of_week
+        description: "ISO day of week (1-7) for Tier 1 rows, NULL for coarser tiers."
+        data_tests:
+          - accepted_range:
+              min_value: 1
+              max_value: 7
+      - name: hour_block
+        description: "Departure hour block for Tiers 1-2, NULL for route-month Tier 3."
+        data_tests:
+          - accepted_values:
+              values: ["early", "morning", "midday", "afternoon", "evening", "late"]
+      - name: is_international
+        description: "True for international T-100 v1 priors; False for domestic OTP+T-100 priors."
+        data_tests:
+          - not_null
+      - name: data_granularity
+        description: "Coverage granularity indicator ('flight_and_route_month' vs 'route_month_only_v1')."
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["flight_and_route_month", "route_month_only_v1"]
+      - name: sample_flights
+        description: "Observed historical scheduled flights or performed T-100 departures backing this cell."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 1
+      - name: mean_open_seats
+        description: "Empirical mean open seats per performed departure."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 500.0
+      - name: std_open_seats
+        description: "Empirical open-seat dispersion floored at 1.5 seats."
+        data_tests:
+          - accepted_range:
+              min_value: 1.5
+              max_value: 500.0
+      - name: mean_seats_config
+        description: "Mean physical cabin seat capacity per departure."
+        data_tests:
+          - accepted_range:
+              min_value: 20.0
+              max_value: 500.0
+      - name: mean_load_factor
+        description: "Mean load factor bounded to [0.0, 1.0]."
+        data_tests:
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+      - name: cancellation_rate
+        description: "Empirical cancellation probability bounded to [0.0, 1.0]."
+        data_tests:
+          - not_null
+          - accepted_range:
+              min_value: 0.0
+              max_value: 1.0
+
   - name: dim_aircraft
     description: >
       Conformed aircraft dimension keyed 1:1 on `tail_num`, handling multi-carrier

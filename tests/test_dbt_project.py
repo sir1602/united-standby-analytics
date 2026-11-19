@@ -27,6 +27,7 @@ SEED_FILES: tuple[str, ...] = (
 EXPECTED_MART_MODELS: tuple[str, ...] = (
     "fct_flights",
     "agg_route_month",
+    "agg_predictor_priors",
     "dim_aircraft",
     "dim_airport",
     "dim_carrier",

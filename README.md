@@ -14,7 +14,9 @@
 
 **United Airlines Standby Opportunity Analytics** models standby seat-availability dynamics for **employee / non-rev standby (`SA`)** travelers departing **Chicago O'Hare (`ORD`)** on **United Airlines mainline (`UA`)** and **United Express** regional partners (`OO`, `YX`, `YV`, `G7`, `C5`, `ZW`, plus pre-COVID 2019 partners `EV` and `AX`) across **`56` months (`2019` baseline + `2023-01` through `2026-08`, `830,941` scheduled domestic flights + `20,877` domestic & international route-months)**.
 
-Because non-revenue standbys board last — behind all revenue passengers, Same-Day Confirmed travelers, and passengers reaccommodated from earlier disrupted flights — the pipeline computes two strictly leakage-separated `0–100` indices:
+Because non-revenue standbys board last — behind all revenue passengers, Same-Day Confirmed travelers, and passengers reaccommodated from earlier disrupted flights — the pipeline computes two strictly leakage-separated `0–100` indices plus a **Day-Based Standby Seat Likelihood Predictor**:
+- **Live Interactive Dashboard & Trip Predictor (GitHub Pages):** **[https://sir1602.github.io/united-standby-analytics/](https://sir1602.github.io/united-standby-analytics/)** — 6-tab zero-CDN web application featuring a mobile-friendly **Trip Predictor** (whole-day clearance likelihood + 80% CI across all 348 ORD destinations, ±3 day flexible-date strip, per-hour-block breakdown, optional live EmployeeRES overrides, and walk-forward probability calibration diagnostics), interactive ORD route network map, DOW × hour-block heatmap, fleet/CPA analytics, and flight-level formula inspector.
+- **CLI Forecast (`standby predict`):** Run `python -m standby predict --dest DEN --date 2026-11-29 --party-size 2 --priority BUDDY` (optionally with `--open-seats`, `--standbys-ahead`, `--hours-out`, `--hour-block`, or `--json`) — backed by the identical seeded correlated Monte Carlo simulator (`Mulberry32`) as the browser UI (`D-41`).
 - **`soi_historical` (`n = 814,847` completed flights; `NULL` if cancelled):** Post-hoc operational audit using realized same-month BTS T-100 load factors, actual tail/cabin layout, realized earlier same-day cancellations/diversions, realized remaining non-cancelled backups, and actual `flight_date` TSA throughput.
 - **`soi_planning` (`n = 626,838` `2023–2026` flights; `100% NULL` in `2019`):** Leakage-free advance trip-planning score using **only** schedule/calendar keys and hierarchical priors fitted strictly on prior calendar years (`train.year < eval.year`), scored across all scheduled flights (including flights that ultimately cancelled, avoiding survivorship bias).
 
@@ -124,16 +126,25 @@ Full warehouse design, billing rules, and benchmark queries are documented in [`
 
 ---
 
-## BI Dashboards: Tableau Public & Google Looker Studio
+## BI Dashboards: Live Web Explorer, Tableau Public & Google Looker Studio
 
-This repository provides **two zero-cost BI delivery paths** from the same validated pipeline:
+This repository provides **three zero-cost BI delivery paths** from the same validated pipeline:
 
-### 1. Tableau Public Dashboard: "United Standby Opportunity Explorer"
-- **Tableau Public Link:** *(Pending user workbook publish — build from [`exports/tableau/`](exports/tableau/) following [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) §6 Publishing Checklist and replace this placeholder URL once published)*
-- **Screenshot Preview:** `<!-- Add exported dashboard PNG screenshot at docs/assets/tableau_dashboard_preview.png once published to Tableau Public -->`
+### 1. Live Interactive Web BI Dashboard (GitHub Pages — Published)
+- **Live Dashboard URL:** **https://sir1602.github.io/united-standby-analytics/**
+- **Source & Data Builder:** [`dashboard/`](dashboard/) built reproducibly via `make build-dashboard` ([`scripts/build_dashboard_data.py`](scripts/build_dashboard_data.py)) from [`exports/looker/`](exports/looker/), [`exports/tableau/dim_date.csv`](exports/tableau/dim_date.csv), and [`docs/phase4_validation_summary.json`](docs/phase4_validation_summary.json), auto-deployed on push to `main` via [`.github/workflows/pages.yml`](.github/workflows/pages.yml).
+- **Interactive Views (5 Tabs):**
+  1. **Network & Route Explorer:** North America + Global ORD Hub-and-Spoke SVG map & searchable 348-destination leaderboard (277 domestic + 71 international `v1`) with click-to-inspect monthly trend drawers.
+  2. **Timing, Heatmap & Seasonality:** Live `Planning (Ex-Ante)` vs. `Historical (Post-Hoc)` Day-of-Week × Hour-Block matrix, 4-component SOI sub-score breakdown, Holiday vs. Baseline chart, and 56-month trend (`2019` baseline vs. `2023–2026`).
+  3. **Fleet, Carriers & Regional CPA:** 9-carrier comparison flagging shared multi-brand CPA spokes (`OO`, `YX`, `2023 ZW`) and 31-subtype cabin capacity vs. SOI scatter plot.
+  4. **Flight-Level Scorer:** Filterable table of representative flights with click-to-inspect exact 4-component SOI equation breakdown.
+  5. **Empirical Validation & BigQuery Audit:** Pillar 1 walk-forward consistency, Pillar 2 face-validity stress test, Pillar 3 weight sensitivity, and live `flight-standby-analytics` warehouse audit (`231/231` dbt tests passing).
+
+### 2. Tableau Public Dashboard: "United Standby Opportunity Explorer"
+- **Specification & Extract Package:** Build from [`exports/tableau/`](exports/tableau/) following [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md) §6 Publishing Checklist.
 - **Deliverables (`exports/tableau/`):** `8` star-schema CSV extracts (`34.91 MiB` total, `< 50 MB` Git-safe; `fct_flights_tableau.csv` = `100,000` stratified rows across all 56 months & 9 carriers, `agg_route_month.csv` = `20,877` domestic + international route-months, `route_map_paths.csv` = `696` `ORD`-spoke path points using Tableau's built-in `Airport` geo role) + [`exports/tableau/export_metadata.json`](exports/tableau/export_metadata.json) + `22` copy-paste Tableau calculated fields in [`docs/tableau_dashboard_spec.md`](docs/tableau_dashboard_spec.md).
 
-### 2. Google Looker Studio Dashboard (Zero-Blend Pre-Joined CSVs or Live BigQuery)
+### 3. Google Looker Studio Dashboard (Zero-Blend Pre-Joined CSVs or Live BigQuery)
 - **Specification & Setup Guide:** [`docs/looker_studio_dashboard_spec.md`](docs/looker_studio_dashboard_spec.md)
 - **Deliverables (`exports/looker/`):** `4` pre-joined (denormalized) CSV extracts (`53.91 MiB` total, `< 50 MiB` per file) requiring **zero Data Blends** in Looker Studio's native File Upload connector:
   - [`exports/looker/looker_flights.csv`](exports/looker/looker_flights.csv) (`100,000` rows × `67` cols, `46.68 MiB`): `fct_flights_tableau` pre-joined with carrier, destination city/country, FAA aircraft model, chronological `day_of_week_label` (`1 - Mon`..`7 - Sun`), `hour_block_label` (`1 - Early`..`6 - Late`), and SOI tier labels.
