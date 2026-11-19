@@ -148,3 +148,8 @@ seeds:
         description: "Official L_AIRCRAFT_TYPE description."
       - name: notes
         description: "Crosswalk mapping notes."
+
+  - name: lk_validation_summary
+    description: >
+      Section 6 validation scorecard (copy of exports/looker/looker_validation_summary.csv),
+      seeded into the `looker` dataset for the Looker Studio Page 4 scorecard.

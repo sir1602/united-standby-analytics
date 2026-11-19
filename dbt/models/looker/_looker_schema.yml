@@ -1,0 +1,35 @@
+version: 2
+
+models:
+  - name: lk_airport_geo
+    description: "Airport lookup with city/region parsed from BTS L_AIRPORT text and a Google Maps geo_query (Looker Studio Geo -> Address)."
+    columns:
+      - name: airport_code
+        data_tests: [unique, not_null]
+  - name: lk_flights
+    description: >
+      Looker Studio flight source: every fct_flights row (830,941 on the full load) with the
+      same pre-joined labels as exports/looker/looker_flights.csv (day/hour-block labels,
+      carrier, destination city, SOI tiers). Partitioned by flight_date.
+    columns:
+      - name: flight_id
+        data_tests: [unique, not_null]
+      - name: day_of_week_label
+        data_tests: [not_null]
+      - name: hour_block_label
+        data_tests: [not_null]
+  - name: lk_route_month
+    description: "Looker Studio route-month source: agg_route_month + carrier, destination geo, and domestic monthly SOI rollups (NULL for international)."
+    columns:
+      - name: route_month_id
+        data_tests: [unique, not_null]
+  - name: lk_route_summary
+    description: "Looker Studio route summary, 1 row per (origin, dest, is_international), for the Page 1 bubble map and leaderboard."
+    columns:
+      - name: route_id
+        data_tests: [unique, not_null]
+  - name: lk_predictor_priors
+    description: "Empirical seat-availability priors behind the Trip Predictor (agg_predictor_priors) with labels and destination geo, for the Looker Studio Predictor page."
+    columns:
+      - name: prior_id
+        data_tests: [unique, not_null]
