@@ -127,3 +127,29 @@ export:
   tableau_stratify_seed: 42
   tableau_float_precision: 4
   tableau_max_file_mb: 50.0
+
+prediction:
+  shrinkage_pseudo_count: 10.0
+  simulation_draws: 2000
+  simulation_seed: 42
+  hub_irrops_corr: 0.35
+  spillover_seats_per_cancel: 18.0
+  spillover_decay: 0.50
+  hub_to_hub_destinations:
+    - DEN
+    - EWR
+    - IAH
+    - SFO
+    - IAD
+    - LAX
+  hub_to_hub_queue_multiplier: 1.45
+  pass_tier_queue_means:
+    SA1P: 0.8
+    SA2: 2.5
+    SA3: 5.0
+    BUDDY: 8.5
+  horizon_volatility_scale:
+    gt_72h: 1.00
+    h24_72: 0.65
+    h6_24: 0.35
+    lt_6h: 0.15

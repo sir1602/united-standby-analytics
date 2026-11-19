@@ -64,34 +64,158 @@
     </div>
 
     <nav class="nav-bar" role="tablist" aria-label="Dashboard Views">
-      <button id="tab-network" class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-network" data-tab="network">
-        1. Network &amp; Route Explorer
+      <button id="tab-predictor" class="tab-btn active" role="tab" aria-selected="true" aria-controls="panel-predictor" data-tab="predictor">
+        1. Trip Predictor
+      </button>
+      <button id="tab-network" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-network" data-tab="network">
+        2. Network &amp; Route Explorer
       </button>
       <button id="tab-timing" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-timing" data-tab="timing">
-        2. Timing, Heatmap &amp; Seasonality
+        3. Timing, Heatmap &amp; Seasonality
       </button>
       <button id="tab-fleet" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-fleet" data-tab="fleet">
-        3. Fleet, Carriers &amp; Regional CPA
+        4. Fleet, Carriers &amp; Regional CPA
       </button>
       <button id="tab-flights" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-flights" data-tab="flights">
-        4. Flight-Level Scorer
+        5. Flight-Level Scorer
       </button>
       <button id="tab-validation" class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-validation" data-tab="validation">
-        5. Empirical Validation &amp; BigQuery Audit
+        6. Empirical Validation &amp; BigQuery Audit
       </button>
     </nav>
   </header>
 
   <main class="main-wrap">
-    <div id="context-banner" class="context-banner" role="status"></div>
+    <div id="context-banner" class="context-banner hidden" role="status"></div>
 
-    <!-- Global KPI Strip -->
-    <section class="kpi-grid" aria-label="Key Performance Indicators" id="kpi-grid">
+    <!-- Global KPI Strip (shown on analytical explorer tabs 2–6) -->
+    <section class="kpi-grid hidden" aria-label="Key Performance Indicators" id="kpi-grid">
       <div class="kpi-card"><div class="loading-state">Loading analytics...</div></div>
     </section>
 
-    <!-- TAB 1: NETWORK & ROUTE EXPLORER -->
-    <section id="panel-network" class="tab-panel active" role="tabpanel" aria-labelledby="tab-network">
+    <!-- TAB 1: DAY-BASED STANDBY TRIP PREDICTOR -->
+    <section id="panel-predictor" class="tab-panel active" role="tabpanel" aria-labelledby="tab-predictor">
+      <div class="panel pred-controls-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">ORD Standby Day Likelihood Predictor</h2>
+            <p class="panel-subtitle">
+              Correlated day-level Monte Carlo forecast across all 348 ORD outbound destinations (277 domestic hour-block routes + 71 international T-100 v1 routes). Runs locally in &lt;25ms.
+            </p>
+          </div>
+          <div class="pred-presets" aria-label="Quick Scenarios">
+            <span class="pred-preset-label">Scenarios:</span>
+            <button type="button" class="btn-ghost pred-preset-btn" data-preset="den-offpeak">DEN Off-Peak Tue</button>
+            <button type="button" class="btn-ghost pred-preset-btn" data-preset="den-tg">DEN Thanksgiving Sun</button>
+            <button type="button" class="btn-ghost pred-preset-btn" data-preset="ewr-live">EWR Live Check</button>
+            <button type="button" class="btn-ghost pred-preset-btn" data-preset="cun-intl">CUN Intl v1</button>
+          </div>
+        </div>
+
+        <div class="pred-form-grid">
+          <div class="pred-field pred-field-dest">
+            <label for="pred-dest-input">Destination from ORD</label>
+            <input id="pred-dest-input" type="text" list="pred-dest-list" class="pred-input" value="DEN" autocomplete="off" placeholder="IATA code or city (e.g. DEN, EWR, LHR)..." />
+            <datalist id="pred-dest-list"></datalist>
+            <div class="pred-quick-dests" aria-label="Popular destinations">
+              <button type="button" class="chip-btn" data-dest="DEN">DEN</button>
+              <button type="button" class="chip-btn" data-dest="EWR">EWR</button>
+              <button type="button" class="chip-btn" data-dest="SFO">SFO</button>
+              <button type="button" class="chip-btn" data-dest="LAX">LAX</button>
+              <button type="button" class="chip-btn" data-dest="MCO">MCO</button>
+              <button type="button" class="chip-btn" data-dest="LHR">LHR</button>
+              <button type="button" class="chip-btn" data-dest="CUN">CUN</button>
+            </div>
+          </div>
+
+          <div class="pred-field">
+            <label for="pred-date">Travel Date</label>
+            <input id="pred-date" type="date" class="pred-input" value="2026-11-29" />
+            <div class="field-hint" id="pred-date-hint">Select any date to compare ±3 days</div>
+          </div>
+
+          <div class="pred-field">
+            <label>Party Size</label>
+            <div class="segmented pred-party-seg" role="group" aria-label="Party size">
+              <button type="button" class="active" data-party="1">1</button>
+              <button type="button" data-party="2">2</button>
+              <button type="button" data-party="3">3</button>
+              <button type="button" data-party="4">4</button>
+            </div>
+            <div class="field-hint">Seats needed together</div>
+          </div>
+
+          <div class="pred-field">
+            <label for="pred-priority">Pass Priority</label>
+            <select id="pred-priority" class="pred-input">
+              <option value="SA1P">SA1P (Vacation / High — ~0.8 ahead)</option>
+              <option value="SA2" selected>SA2 (Employee Leisure — ~2.5 ahead)</option>
+              <option value="SA3">SA3 (Enrolled Friend — ~5.0 ahead)</option>
+              <option value="BUDDY">Buddy Pass — ~8.5 ahead</option>
+            </select>
+            <div class="field-hint" id="pred-priority-hint">Scaled 1.45× on UA hubs &amp; 1.35× peak holidays</div>
+          </div>
+
+          <div class="pred-field">
+            <label for="pred-carrier">Carrier Group</label>
+            <select id="pred-carrier" class="pred-input">
+              <option value="ALL" selected>All UA Family</option>
+              <option value="MAINLINE">United Mainline (UA)</option>
+              <option value="EXPRESS">United Express Partners</option>
+            </select>
+            <div class="field-hint" id="pred-carrier-hint">Domestic schedule filter</div>
+          </div>
+        </div>
+
+        <details id="pred-live-details" class="pred-live-box">
+          <summary>
+            <span>Have EmployeeRES Data? <strong>Sharpen Forecast with Live Counts</strong></span>
+            <span id="pred-live-badge" class="badge badge-null">Advance Historical Prior</span>
+          </summary>
+          <div class="pred-live-grid">
+            <div class="pred-field">
+              <label for="pred-open-override">Current Open Seats (Optional)</label>
+              <input id="pred-open-override" type="number" min="0" max="400" step="1" class="pred-input" placeholder="Leave blank for historical prior" />
+            </div>
+            <div class="pred-field">
+              <label for="pred-queue-override">Standbys Ahead of Me (Optional)</label>
+              <input id="pred-queue-override" type="number" min="0" max="200" step="1" class="pred-input" placeholder="Replaces pass-tier queue prior 1:1" />
+            </div>
+            <div class="pred-field">
+              <label for="pred-horizon">Hours Until Departure</label>
+              <select id="pred-horizon" class="pred-input">
+                <option value="96">&gt; 72 hours (100% prior volatility)</option>
+                <option value="48">24–72 hours (72% volatility)</option>
+                <option value="12" selected>6–24 hours (45% volatility)</option>
+                <option value="3">&lt; 6 hours (25% volatility)</option>
+              </select>
+            </div>
+            <div class="pred-field">
+              <label for="pred-target-hb">Apply Open Seats To</label>
+              <select id="pred-target-hb" class="pred-input">
+                <option value="">All Departure Windows</option>
+                <option value="early">Early (05:00–07:59)</option>
+                <option value="morning">Morning (08:00–10:59)</option>
+                <option value="midday">Midday (11:00–13:59)</option>
+                <option value="afternoon">Afternoon (14:00–16:59)</option>
+                <option value="evening">Evening (17:00–19:59)</option>
+                <option value="late">Late (20:00–04:59)</option>
+              </select>
+            </div>
+            <div class="pred-live-actions">
+              <button id="pred-reset-live" type="button" class="btn-ghost">Clear Overrides</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div id="pred-results-root">
+        <div class="panel"><div class="loading-state">Loading predictor priors...</div></div>
+      </div>
+    </section>
+
+    <!-- TAB 2: NETWORK & ROUTE EXPLORER -->
+    <section id="panel-network" class="tab-panel" role="tabpanel" aria-labelledby="tab-network">
       <div class="panel">
         <div class="panel-head">
           <div>
@@ -445,6 +569,29 @@
           </div>
         </div>
       </div>
+      <div class="panel" id="val-calibration-panel">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Trip Predictor: Walk-Forward Probability Calibration (2023–2026)</h2>
+            <p class="panel-subtitle">
+              Strictly out-of-sample (<code>train.year &lt; eval.year</code>) calibration of flight-level open-seat availability <code>P(not cancelled &amp; open_seats ≥ k)</code> across 75,930 flights. Competing pass-tier queues are layered separately.
+            </p>
+          </div>
+          <div class="panel-controls">
+            <select id="cal-threshold-select" class="control-select" aria-label="Calibration seat threshold">
+              <option value="ge_1">Threshold: ≥ 1 Open Seat</option>
+              <option value="ge_2">Threshold: ≥ 2 Open Seats</option>
+              <option value="ge_5">Threshold: ≥ 5 Open Seats</option>
+              <option value="ge_10" selected>Threshold: ≥ 10 Open Seats</option>
+            </select>
+          </div>
+        </div>
+        <div id="val-cal-kpis" class="cal-kpi-row"></div>
+        <div class="grid-2">
+          <div id="val-cal-reliability"></div>
+          <div id="val-cal-table-wrap"></div>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -456,7 +603,7 @@
       </div>
       <div>
         <a href="https://github.com/sir1602/united-standby-analytics" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
-        · Live BigQuery: <span class="mono">flight-standby-analytics</span> (231/231 dbt tests PASS)
+        · Live BigQuery: <span class="mono">flight-standby-analytics</span> (20 dbt models · 231+ dbt tests PASS)
       </div>
     </div>
   </footer>
@@ -478,6 +625,7 @@
     </aside>
   </div>
 
+  <script src="predictor.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

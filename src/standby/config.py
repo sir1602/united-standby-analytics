@@ -111,6 +111,36 @@ class ExportConfig:
     tableau_max_file_mb: float = 50.0
 
 
+@dataclass(frozen=True)
+class PredictionConfig:
+    """Configuration parameters for the Day-Based Standby Likelihood Predictor."""
+
+    shrinkage_pseudo_count: float = 10.0
+    simulation_draws: int = 2_000
+    simulation_seed: int = 42
+    hub_irrops_corr: float = 0.35
+    spillover_seats_per_cancel: float = 18.0
+    spillover_decay: float = 0.50
+    hub_to_hub_destinations: tuple[str, ...] = ("DEN", "EWR", "IAH", "SFO", "IAD", "LAX")
+    hub_to_hub_queue_multiplier: float = 1.45
+    pass_tier_queue_means: dict[str, float] = field(
+        default_factory=lambda: {
+            "SA1P": 0.8,
+            "SA2": 2.5,
+            "SA3": 5.0,
+            "BUDDY": 8.5,
+        }
+    )
+    horizon_volatility_scale: dict[str, float] = field(
+        default_factory=lambda: {
+            "gt_72h": 1.00,
+            "h24_72": 0.65,
+            "h6_24": 0.35,
+            "lt_6h": 0.15,
+        }
+    )
+
+
 @dataclass
 class StandbyConfig:
     """Typed pipeline configuration resolved from `config/standby.yaml`."""
@@ -138,6 +168,7 @@ class StandbyConfig:
     sanity_checks: SanityCheckConfig = field(default_factory=SanityCheckConfig)
     scoring: ScoringConfig = field(default_factory=ScoringConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
+    prediction: PredictionConfig = field(default_factory=PredictionConfig)
     sample_mode: bool = False
     dry_run: bool = False
     raw_yaml: dict[str, Any] = field(default_factory=dict, repr=False)
@@ -417,6 +448,40 @@ def load_config(
         ),
     )
 
+    pred_raw = raw.get("prediction", {})
+    default_pred = PredictionConfig()
+    pred_config = PredictionConfig(
+        shrinkage_pseudo_count=float(
+            pred_raw.get("shrinkage_pseudo_count", default_pred.shrinkage_pseudo_count)
+        ),
+        simulation_draws=int(pred_raw.get("simulation_draws", default_pred.simulation_draws)),
+        simulation_seed=int(pred_raw.get("simulation_seed", default_pred.simulation_seed)),
+        hub_irrops_corr=float(pred_raw.get("hub_irrops_corr", default_pred.hub_irrops_corr)),
+        spillover_seats_per_cancel=float(
+            pred_raw.get("spillover_seats_per_cancel", default_pred.spillover_seats_per_cancel)
+        ),
+        spillover_decay=float(pred_raw.get("spillover_decay", default_pred.spillover_decay)),
+        hub_to_hub_destinations=tuple(
+            str(d).strip().upper()
+            for d in pred_raw.get("hub_to_hub_destinations", default_pred.hub_to_hub_destinations)
+        ),
+        hub_to_hub_queue_multiplier=float(
+            pred_raw.get("hub_to_hub_queue_multiplier", default_pred.hub_to_hub_queue_multiplier)
+        ),
+        pass_tier_queue_means={
+            str(k).strip().upper(): float(v)
+            for k, v in pred_raw.get(
+                "pass_tier_queue_means", default_pred.pass_tier_queue_means
+            ).items()
+        },
+        horizon_volatility_scale={
+            str(k).strip(): float(v)
+            for k, v in pred_raw.get(
+                "horizon_volatility_scale", default_pred.horizon_volatility_scale
+            ).items()
+        },
+    )
+
     return StandbyConfig(
         project_name=str(proj.get("name", "united-standby-analytics")),
         project_version=str(proj.get("version", "0.1.0")),
@@ -442,6 +507,7 @@ def load_config(
         sanity_checks=sanity_config,
         scoring=scoring_config,
         export=export_config,
+        prediction=pred_config,
         sample_mode=sample_mode,
         dry_run=dry_run,
         raw_yaml=raw,

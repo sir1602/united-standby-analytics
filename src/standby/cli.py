@@ -789,3 +789,203 @@ def export_looker_cmd(
         f"{result.total_source_flights:,}, total_mb={total_bytes / (1024 * 1024):.2f}, "
         f"output_dir={result.output_dir}"
     )
+
+
+@main.command("predict")
+@click.option(
+    "--dest",
+    required=True,
+    help="Destination 3-letter IATA airport code from ORD (e.g. DEN, EWR, LHR, CUN).",
+)
+@click.option(
+    "--date",
+    "flight_date",
+    required=True,
+    help="Target travel date in YYYY-MM-DD format.",
+)
+@click.option(
+    "--party-size",
+    type=click.IntRange(1, 6),
+    default=1,
+    show_default=True,
+    help="Number of non-rev travelers in your party (1-6).",
+)
+@click.option(
+    "--priority",
+    type=click.Choice(["SA1P", "SA2", "SA3", "BUDDY"], case_sensitive=False),
+    default="SA2",
+    show_default=True,
+    help="Standby pass priority tier (mapped to transparent estimated queue priors unless overridden).",
+)
+@click.option(
+    "--carrier-group",
+    type=click.Choice(["ALL", "MAINLINE", "EXPRESS"], case_sensitive=False),
+    default="ALL",
+    show_default=True,
+    help="Filter domestic flights to ALL, MAINLINE, or EXPRESS.",
+)
+@click.option(
+    "--open-seats",
+    type=click.FloatRange(min=0.0, max=400.0),
+    default=None,
+    help="Optional live EmployeeRES open-seat count override.",
+)
+@click.option(
+    "--standbys-ahead",
+    type=click.IntRange(min=0, max=200),
+    default=None,
+    help="Optional live EmployeeRES count of standbys listed ahead of you.",
+)
+@click.option(
+    "--hours-out",
+    type=click.FloatRange(min=0.0, max=720.0),
+    default=None,
+    help="Hours until departure (tightens booking volatility when paired with --open-seats).",
+)
+@click.option(
+    "--hour-block",
+    type=click.Choice(
+        ["early", "morning", "midday", "afternoon", "evening", "late"],
+        case_sensitive=False,
+    ),
+    default=None,
+    help="Optional target hour block to apply --open-seats override to.",
+)
+@click.option(
+    "--draws",
+    type=click.IntRange(min=200, max=20000),
+    default=None,
+    help="Monte Carlo simulation draws (defaults to config prediction.simulation_draws).",
+)
+@click.option(
+    "--priors-path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional path to pre-built predictor_priors.json.",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit machine-readable JSON output.",
+)
+def predict_cmd(
+    dest: str,
+    flight_date: str,
+    party_size: int,
+    priority: str,
+    carrier_group: str,
+    open_seats: float | None,
+    standbys_ahead: int | None,
+    hours_out: float | None,
+    hour_block: str | None,
+    draws: int | None,
+    priors_path: Path | None,
+    as_json: bool,
+) -> None:
+    """Predict whole-day and per-hour-block standby seat clearance likelihood for a route & date."""
+    import json
+    from datetime import date as date_cls
+
+    from standby.prediction import (
+        PredictionRequest,
+        load_default_priors,
+        load_priors_json,
+        predict_standby_day,
+    )
+
+    try:
+        parsed_date = date_cls.fromisoformat(flight_date.strip()[:10])
+    except ValueError as exc:
+        raise click.BadParameter(
+            f"Invalid --date '{flight_date}'; expected YYYY-MM-DD.", param_hint="'--date'"
+        ) from exc
+
+    cfg = load_config()
+    priors = (
+        load_priors_json(priors_path)
+        if priors_path is not None
+        else load_default_priors(repo_root=cfg.repo_root, config=cfg)
+    )
+
+    dest_u = dest.strip().upper()
+    if dest_u not in priors.routes:
+        raise click.ClickException(
+            f"Destination '{dest_u}' not found in ORD route priors ({len(priors.routes)} routes available)."
+        )
+
+    req = PredictionRequest(
+        dest=dest_u,
+        flight_date=parsed_date,
+        party_size=party_size,
+        priority=priority.upper(),
+        carrier_group=carrier_group.upper(),
+        open_seats_override=open_seats,
+        standbys_ahead_override=standbys_ahead,
+        hours_until_departure=hours_out,
+        target_hour_block=hour_block.lower() if hour_block else None,
+        draws=draws,
+    )
+    res = predict_standby_day(req, priors, config=cfg)
+
+    if as_json:
+        click.echo(json.dumps(res.to_dict(), indent=2))
+        return
+
+    hol_tag = f" | Holiday: {res.holiday_name}" if res.holiday_name else ""
+    scope_tag = " [International T-100 Route-Month Prior v1]" if res.is_international_v1 else ""
+    click.echo(
+        f"\nORD -> {res.dest} ({res.dest_city}, {res.dest_state_or_country}){scope_tag}\n"
+        f"Date: {res.flight_date} ({res.day_of_week}){hol_tag}\n"
+        f"Party: {res.party_size} | Priority: {res.priority} | Carrier: {res.carrier_group} | Mode: {res.mode}\n"
+        + "-"
+        * 76
+    )
+    click.echo(
+        f"Whole-Day Clearance Likelihood : {res.whole_day_prob * 100:5.1f}%  "
+        f"(80% CI: {res.ci_low_80 * 100:.0f}%–{res.ci_high_80 * 100:.0f}%)  [{res.risk_tier}]"
+    )
+    click.echo(
+        f"Seat-Only Availability (No Q)  : {res.seat_only_whole_day_prob * 100:5.1f}%  "
+        "(empirically calibrated open-seat prior)"
+    )
+    click.echo(
+        f"Competing Standbys Ahead       : {res.estimated_queue_ahead:5.1f}  ({res.queue_source})"
+    )
+    click.echo(
+        f"Expected Daily Schedule        : {res.expected_daily_flights:.1f} flights/day | "
+        f"Avg open seats: {res.expected_open_seats_avg:.1f} | "
+        f"Cancel risk: {res.expected_cancel_rate * 100:.1f}%"
+    )
+    if res.best_hour_block:
+        click.echo(
+            f"Best Departure Window          : {res.best_hour_block} "
+            f"({(res.best_hour_block_prob or 0.0) * 100:.0f}% single-bank)"
+        )
+
+    click.echo("\nDeparture Window Breakdown:")
+    click.echo(
+        f"  {'Window':<32} {'Flights':>7} {'Open':>6} {'Canc%':>6} {'Seat%':>7} {'Clear%':>7}"
+    )
+    for hb in res.hour_blocks:
+        click.echo(
+            f"  {hb.label:<32} {hb.expected_flights:7.1f} {hb.expected_open_seats:6.1f} "
+            f"{hb.cancel_rate * 100:5.1f}% {hb.seat_avail_prob * 100:6.0f}% {hb.clearance_prob * 100:6.0f}%"
+        )
+
+    click.echo("\nFlexible Dates (±3 Days):")
+    for nd in res.neighbor_days:
+        marker = " <-- selected" if nd.flight_date == res.flight_date else ""
+        delta = (
+            f" ({nd.delta_vs_selected * 100:+.0f}pp)" if nd.flight_date != res.flight_date else ""
+        )
+        htag = f" [{nd.holiday_name}]" if nd.holiday_name else ""
+        click.echo(
+            f"  {nd.flight_date} ({nd.day_of_week}): {nd.whole_day_prob * 100:5.1f}%{delta}{htag}{marker}"
+        )
+
+    click.echo("\nKey Drivers:")
+    for drv in res.drivers:
+        click.echo(f"  - {drv}")
+    click.echo(f"\nNote: {res.disclaimer}\n")

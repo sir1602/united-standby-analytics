@@ -190,3 +190,14 @@ Per `docs/phase0_validation_report.md` §3.5, every consumer of the Standby Oppo
 9. **TSA National Checkpoint Volume Scope ($S_{\text{demand}}$):** TSA reports **national** daily screening totals across all U.S. airports, capturing macro holiday/day-of-week peaks while missing localized city-specific events (e.g., conventions in `LAS`/`MCO` or Chicago festivals).
 10. **Point-in-Time Seat Configuration (`seats_config`):** `reference/seat_config.csv` and `reference/tail_overrides.csv` use curated `as_of` cabin layouts. Multi-year cabin retrofits ("United Next") are guarded via Sanity Check #3 (`T-100 seats/dep` vs. `seats_config`, max diff `5.68%`).
 11. **International Scope in v1 (`agg_route_month`):** BTS OTP covers U.S. domestic flights only. All `51,673` `ORD` `UA` international departures (`2019`, `2023–2026-08`) are analyzed at the `route × month × carrier` grain in `agg_route_month` (`is_international = true`, `data_granularity = 'route_month_only_v1'`). Flight-level international tracking via OpenSky Network / FlightAware AeroAPI is a documented **v2 enhancement**.
+
+---
+
+## 5. Day-Based Standby Seat Likelihood Predictor Extension (`D-41`)
+
+Building directly on the validated `soi_historical` / `soi_planning` pipeline without replacing its non-probability heuristic guarantee, the repository includes a **Day-Based Standby Seat Likelihood Predictor** (`src/standby/prediction/`, `dbt/models/marts/agg_predictor_priors.sql`, `standby predict`, and Tab 1 of the live dashboard):
+
+- **4-Tier Hierarchical Empirical Bayes Priors:** Fits open-seat means/standard deviations, seat capacities, cancellation rates, and scheduled departure-frequency distributions across all `348` ORD outbound destinations (`277` domestic hour-block routes + `71` international `route_month_only_v1` routes), with shrinkage from `(dest, month, dow, hour_block)` $\to$ `(dest, month, hour_block)` $\to$ `(dest, month)` $\to$ `(month, hour_block)`.
+- **Correlated Day-Level Monte Carlo (`Mulberry32`, $N = 2{,}000$):** Combines shifted Log-Normal open-seat draws with shared ORD hub IRROPS (`0.35`) and same-day route demand (`0.58`) correlation factors, cancellation spillover (`18.0` seats/cancel with `0.50` decay into later banks), and `40` outer epistemic batches for an `80%` confidence interval. Implemented with bit-for-bit parity between Python (`src/standby/prediction/simulator.py`) and browser JS (`dashboard/predictor.js`).
+- **Analytical Honesty Guardrail:** Every prediction strictly separates **empirically calibrated open-seat availability** ($P(\text{open seats} \ge \text{party size})$ validated via expanding walk-forward Brier/BSS/ECE/AUC in `src/standby/prediction/calibration.py`) from **pass-tier queue clearance** (`SA1P` through `BUDDY`), unless the traveler supplies live **EmployeeRES** counts (`open_seats`, `standbys_ahead`, `hours_until_departure`). See `docs/decisions.md` (`D-41`) for full specification.
+

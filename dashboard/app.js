@@ -60,11 +60,12 @@
   ];
 
   let DATA = null;
+  let PRIORS = null;
   const state = {
     mode: "plan", // "plan" | "hist"
     year: "POST", // "ALL" | "POST" | "2026" | "2025" | "2024" | "2023" | "2019"
     carrierGroup: "ALL", // "ALL" | "MAINLINE" | "EXPRESS"
-    tab: "network",
+    tab: "predictor",
     mapView: "na", // "na" | "global"
     mapScope: "ALL",
     routeSearch: "",
@@ -77,6 +78,18 @@
     flightHb: "ALL",
     flightTier: "ALL",
     flightPage: 1,
+    calThreshold: "ge_10",
+    pred: {
+      dest: "DEN",
+      flight_date: "2026-11-29",
+      party_size: 1,
+      priority: "SA2",
+      carrier_group: "ALL",
+      open_seats_override: "",
+      standbys_ahead_override: "",
+      hours_until_departure: 12,
+      target_hour_block: "",
+    },
   };
 
   // DOM Helpers
@@ -1312,7 +1325,8 @@
       ["GCP BigQuery Project", `flight-standby-analytics (US, billing-enabled free tier, partition_expiration_ms = NULL)`, "PASS"],
       ["marts.fct_flights", `830,941 rows · 1,704 DAY partitions · CLUSTER BY (origin, dest, op_carrier) · 469 MiB`, "PASS"],
       ["marts.agg_route_month", `20,877 rows (18,577 domestic + 2,300 international v1) · 4 dims (1,908 tails, 349 airports)`, "PASS"],
-      ["dbt build (Live BigQuery)", `PASS=253 WARN=0 ERROR=0 (19 models, 3 seeds, 231/231 data & singular tests)`, "PASS"],
+      ["marts.agg_predictor_priors", `Hierarchical Empirical Bayes priors across 348 ORD routes (Tiers 1–3 domestic + T-100 intl v1)`, "PASS"],
+      ["dbt build (Warehouse + DuckDB)", `20 dbt models, 3 seeds, 231+ schema & singular tests PASS (0 errors, 0 warnings)`, "PASS"],
       ["FAA 3-Tier Seat Resolution", `814,847 / 814,847 performed flights resolved (100.0000%; 9,263 GA/Stearman collisions rejected)`, "PASS"],
       ["SC-1 & SOI Bounds", `0 passenger/seat bound violations · 0 SOI [0, 100] violations across 10 score columns`, "PASS"],
       ["SC-2 / SC-3 / SC-4", `Mainline OTP/T-100 +0.16% · Max seat diff 5.68% · System UA LF 82.89% (80–85% target)`, "PASS"],
@@ -1325,6 +1339,455 @@
         <td><span class="badge badge-pass">${st}</span></td>
       </tr>
     `).join("");
+
+    renderCalibrationPanel();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6B. WALK-FORWARD CALIBRATION PANEL (TAB 6)
+  // ---------------------------------------------------------------------------
+  function renderCalibrationPanel() {
+    const kpiRoot = $("#val-cal-kpis");
+    const chartRoot = $("#val-cal-reliability");
+    const tableRoot = $("#val-cal-table-wrap");
+    if (!kpiRoot || !chartRoot || !tableRoot) return;
+    if (!PRIORS || !PRIORS.calibration || !PRIORS.calibration.thresholds) {
+      kpiRoot.innerHTML = `<div class="pred-metric-tile"><div class="m-sub">Calibration summary unavailable.</div></div>`;
+      return;
+    }
+
+    const cal = PRIORS.calibration;
+    const th = cal.thresholds[state.calThreshold] || Object.values(cal.thresholds)[0];
+    if (!th) return;
+
+    kpiRoot.innerHTML = `
+      <div class="pred-metric-tile">
+        <div class="m-label">Brier Score (vs. Clim ${th.climatology_brier.toFixed(4)})</div>
+        <div class="m-val">${th.brier_score.toFixed(4)}</div>
+        <div class="m-sub">Skill Score (BSS): <strong style="color:${th.brier_skill_score >= 0 ? "var(--soi-high)" : "var(--soi-tight)"}">${th.brier_skill_score >= 0 ? "+" : ""}${(th.brier_skill_score * 100).toFixed(1)}%</strong></div>
+      </div>
+      <div class="pred-metric-tile">
+        <div class="m-label">Expected Calibration Error (ECE)</div>
+        <div class="m-val">${(th.ece * 100).toFixed(2)}%</div>
+        <div class="m-sub">Mean absolute bin gap across 10 deciles</div>
+      </div>
+      <div class="pred-metric-tile">
+        <div class="m-label">ROC-AUC (Out-of-Sample)</div>
+        <div class="m-val">${th.roc_auc.toFixed(3)}</div>
+        <div class="m-sub">Base empirical rate: ${(th.base_rate * 100).toFixed(1)}%</div>
+      </div>
+      <div class="pred-metric-tile">
+        <div class="m-label">Walk-Forward Sample</div>
+        <div class="m-val">${fmtInt(th.n_eval)}</div>
+        <div class="m-sub">Strict train.year &lt; eval.year (${cal.eval_years.join(", ")})</div>
+      </div>
+    `;
+
+    // 10-bin Reliability Diagram SVG
+    const W = 460, H = 260, ml = 46, mr = 18, mt = 18, mb = 38;
+    const pw = W - ml - mr, ph = H - mt - mb;
+    const xOf = (v) => ml + v * pw;
+    const yOf = (v) => mt + (1 - v) * ph;
+
+    let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;max-width:520px;display:block;">`;
+    [0, 0.2, 0.4, 0.6, 0.8, 1.0].forEach((tk) => {
+      const x = xOf(tk), y = yOf(tk);
+      svg += `<line x1="${ml}" y1="${y.toFixed(1)}" x2="${W - mr}" y2="${y.toFixed(1)}" stroke="var(--border)" stroke-dasharray="2 3"/>`;
+      svg += `<line x1="${x.toFixed(1)}" y1="${mt}" x2="${x.toFixed(1)}" y2="${H - mb}" stroke="var(--border)" stroke-dasharray="2 3"/>`;
+      svg += `<text x="${ml - 8}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-muted)">${Math.round(tk * 100)}%</text>`;
+      svg += `<text x="${x.toFixed(1)}" y="${H - mb + 14}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${Math.round(tk * 100)}%</text>`;
+    });
+    // Diagonal perfect calibration reference line
+    svg += `<line x1="${xOf(0)}" y1="${yOf(0)}" x2="${xOf(1)}" y2="${yOf(1)}" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    const bins = th.reliability_bins || [];
+    if (bins.length > 1) {
+      const pts = bins.map((b) => `${xOf(b.mean_pred).toFixed(1)},${yOf(b.empirical_rate).toFixed(1)}`).join(" ");
+      svg += `<polyline points="${pts}" fill="none" stroke="var(--brand)" stroke-width="2.4"/>`;
+    }
+    bins.forEach((b) => {
+      const cx = xOf(b.mean_pred);
+      const cy = yOf(b.empirical_rate);
+      const r = Math.max(3.5, Math.min(8.5, 2.5 + Math.log10(Math.max(1, b.n)) * 1.35));
+      svg += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="var(--brand)" stroke="var(--surface)" stroke-width="1.5"><title>${b.bin_range}: Pred ${(b.mean_pred * 100).toFixed(1)}% vs Observed ${(b.empirical_rate * 100).toFixed(1)}% (n=${fmtInt(b.n)})</title></circle>`;
+    });
+    svg += `<text x="${(ml + W - mr) / 2}" y="${H - 6}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-secondary)">Predicted P(≥ ${th.threshold_seats} Open Seats)</text>`;
+    svg += `<text x="14" y="${(mt + H - mb) / 2}" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-secondary)" transform="rotate(-90 14 ${(mt + H - mb) / 2})">Observed Frequency</text>`;
+    svg += `</svg>`;
+    chartRoot.innerHTML = svg;
+
+    // Compact comparison table across all 4 seat thresholds
+    const rows = Object.values(cal.thresholds).map((t) => `
+      <tr style="${t.threshold_seats === th.threshold_seats ? "background:var(--brand-soft)" : ""}">
+        <td><strong>≥ ${t.threshold_seats} open seat${t.threshold_seats > 1 ? "s" : ""}</strong></td>
+        <td class="num">${(t.base_rate * 100).toFixed(1)}%</td>
+        <td class="num mono">${t.brier_score.toFixed(4)}</td>
+        <td class="num mono" style="color:${t.brier_skill_score >= 0 ? "var(--soi-high)" : "var(--soi-tight)"}">${t.brier_skill_score >= 0 ? "+" : ""}${(t.brier_skill_score * 100).toFixed(1)}%</td>
+        <td class="num mono">${(t.ece * 100).toFixed(2)}%</td>
+        <td class="num mono">${t.roc_auc.toFixed(3)}</td>
+      </tr>
+    `).join("");
+    tableRoot.innerHTML = `
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Threshold</th>
+              <th class="num">Base Rate</th>
+              <th class="num">Brier</th>
+              <th class="num">Skill (BSS)</th>
+              <th class="num">ECE</th>
+              <th class="num">ROC-AUC</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      <div class="caveat-box" style="margin-top:10px">${esc(cal.note)}</div>
+    `;
+  }
+
+  // ---------------------------------------------------------------------------
+  // 6C. TAB 1: DAY-BASED STANDBY TRIP PREDICTOR
+  // ---------------------------------------------------------------------------
+  function probColor(p) {
+    if (p >= 0.80) return "var(--soi-high)";
+    if (p >= 0.60) return "var(--soi-mod)";
+    if (p >= 0.40) return "var(--soi-tight)";
+    return "var(--soi-low)";
+  }
+
+  function probBadgeClass(p) {
+    if (p >= 0.80) return "badge-high";
+    if (p >= 0.60) return "badge-mod";
+    if (p >= 0.40) return "badge-tight";
+    return "badge-low";
+  }
+
+  function populatePredictorDatalist() {
+    const dl = $("#pred-dest-list");
+    if (!dl || !PRIORS) return;
+    const sorted = Object.entries(PRIORS.routes).sort((a, b) => (b[1].deps || 0) - (a[1].deps || 0));
+    dl.innerHTML = sorted
+      .map(([code, r]) => {
+        const tag = r.intl ? "Intl v1" : "Domestic";
+        return `<option value="${esc(code)}">${esc(code)} — ${esc(r.cty)}, ${esc(r.st)} (${tag})</option>`;
+      })
+      .join("");
+  }
+
+  function resolveTypedDest(rawText) {
+    if (!PRIORS) return null;
+    const clean = String(rawText || "").trim().toUpperCase();
+    if (PRIORS.routes[clean]) return clean;
+    const prefix = clean.slice(0, 3);
+    if (PRIORS.routes[prefix]) return prefix;
+    // Try matching city name substring
+    for (const [code, r] of Object.entries(PRIORS.routes)) {
+      if (String(r.cty || "").toUpperCase().includes(clean) && clean.length >= 3) {
+        return code;
+      }
+    }
+    return null;
+  }
+
+  function renderGaugeSvg(prob, ciLow, ciHigh, tierText) {
+    const W = 280, H = 162, cx = 140, cy = 136, r = 104;
+    const arcPt = (frac) => {
+      const ang = Math.PI * (1 - Math.max(0, Math.min(1, frac)));
+      return [cx + r * Math.cos(ang), cy - r * Math.sin(ang)];
+    };
+    const arcPath = (f0, f1) => {
+      const [x0, y0] = arcPt(f0);
+      const [x1, y1] = arcPt(f1);
+      const large = f1 - f0 > 0.5 ? 1 : 0;
+      return `M ${x0.toFixed(1)} ${y0.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x1.toFixed(1)} ${y1.toFixed(1)}`;
+    };
+    const col = probColor(prob);
+    const [nx, ny] = arcPt(prob);
+    const ciSpan = Math.max(0.015, ciHigh - ciLow);
+
+    return `
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:290px;height:auto;" aria-label="Whole-day standby clearance likelihood ${(prob * 100).toFixed(0)} percent">
+        <path d="${arcPath(0, 1)}" fill="none" stroke="var(--border)" stroke-width="18" stroke-linecap="round"/>
+        ${prob > 0.005 ? `<path d="${arcPath(0, prob)}" fill="none" stroke="${col}" stroke-width="18" stroke-linecap="round" opacity="0.88"/>` : ""}
+        ${ciSpan > 0.02 ? `<path d="${arcPath(Math.max(0, ciLow), Math.min(1, ciHigh))}" fill="none" stroke="var(--text)" stroke-width="4" stroke-linecap="round" opacity="0.35"/>` : ""}
+        <circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="7" fill="var(--surface)" stroke="${col}" stroke-width="3.5"/>
+        <text x="${cx}" y="${cy - 32}" text-anchor="middle" font-size="38" font-weight="800" font-family="var(--font-mono)" fill="${col}">${Math.round(prob * 100)}%</text>
+        <text x="${cx}" y="${cy - 10}" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text-secondary)">80% CI: ${Math.round(ciLow * 100)}%–${Math.round(ciHigh * 100)}%</text>
+        <text x="${cx - r}" y="${cy + 18}" text-anchor="middle" font-size="10" fill="var(--text-muted)">0%</text>
+        <text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="11" font-weight="700" fill="${col}">${esc(tierText)}</text>
+        <text x="${cx + r}" y="${cy + 18}" text-anchor="middle" font-size="10" fill="var(--text-muted)">100%</text>
+      </svg>
+    `;
+  }
+
+  function syncPredictorInputs() {
+    const p = state.pred;
+    const destIn = $("#pred-dest-input");
+    if (destIn && destIn.value.trim().toUpperCase() !== p.dest) destIn.value = p.dest;
+    const dateIn = $("#pred-date");
+    if (dateIn && dateIn.value !== p.flight_date) dateIn.value = p.flight_date;
+    $$("[data-party]").forEach((b) =>
+      b.classList.toggle("active", Number(b.getAttribute("data-party")) === p.party_size)
+    );
+    $$(".pred-quick-dests .chip-btn").forEach((b) =>
+      b.classList.toggle("active", b.getAttribute("data-dest") === p.dest)
+    );
+    const prioSel = $("#pred-priority");
+    if (prioSel) prioSel.value = p.priority;
+    const cgSel = $("#pred-carrier");
+    if (cgSel) cgSel.value = p.carrier_group;
+    const openIn = $("#pred-open-override");
+    if (openIn && openIn.value !== String(p.open_seats_override)) openIn.value = p.open_seats_override;
+    const qIn = $("#pred-queue-override");
+    if (qIn && qIn.value !== String(p.standbys_ahead_override)) qIn.value = p.standbys_ahead_override;
+    const hSel = $("#pred-horizon");
+    if (hSel) hSel.value = String(p.hours_until_departure);
+    const hbSel = $("#pred-target-hb");
+    if (hbSel) hbSel.value = p.target_hour_block;
+  }
+
+  function renderPredictor() {
+    const root = $("#pred-results-root");
+    if (!root) return;
+    if (!PRIORS || !window.StandbyPredictor) {
+      root.innerHTML = `<div class="panel"><div class="loading-state">Loading predictor priors...</div></div>`;
+      return;
+    }
+
+    const p = state.pred;
+    const routeInfo = PRIORS.routes[p.dest];
+    if (!routeInfo) {
+      root.innerHTML = `<div class="panel"><p class="panel-subtitle">Select a valid 3-letter ORD destination code (348 stations available).</p></div>`;
+      return;
+    }
+
+    // Update carrier group hint/disable state for international v1 routes
+    const cgSel = $("#pred-carrier");
+    const cgHint = $("#pred-carrier-hint");
+    if (cgSel && cgHint) {
+      if (routeInfo.intl === 1) {
+        cgSel.disabled = true;
+        cgHint.textContent = "International v1 uses combined T-100 route-month priors";
+      } else {
+        cgSel.disabled = false;
+        cgHint.textContent = "Domestic schedule filter";
+      }
+    }
+
+    const hasLive = p.open_seats_override !== "" || p.standbys_ahead_override !== "";
+    const liveBadge = $("#pred-live-badge");
+    if (liveBadge) {
+      liveBadge.textContent = hasLive ? "Live EmployeeRES Active" : "Advance Historical Prior";
+      liveBadge.className = `badge ${hasLive ? "badge-high" : "badge-null"}`;
+    }
+
+    const res = window.StandbyPredictor.predictStandbyDay(
+      {
+        dest: p.dest,
+        flight_date: p.flight_date,
+        party_size: p.party_size,
+        priority: p.priority,
+        carrier_group: routeInfo.intl === 1 ? "ALL" : p.carrier_group,
+        open_seats_override: p.open_seats_override === "" ? null : Number(p.open_seats_override),
+        standbys_ahead_override: p.standbys_ahead_override === "" ? null : Number(p.standbys_ahead_override),
+        hours_until_departure: hasLive ? Number(p.hours_until_departure) : null,
+        target_hour_block: p.target_hour_block || null,
+      },
+      PRIORS,
+      true
+    );
+
+    const scopeBadges = [];
+    if (res.is_international_v1) {
+      scopeBadges.push(`<span class="badge badge-intl">Route-Month Prior Only v1</span>`);
+    } else {
+      scopeBadges.push(`<span class="badge badge-dom">Domestic Correlated Hour-Block Model</span>`);
+    }
+    if (res.is_hub_to_hub) {
+      scopeBadges.push(`<span class="badge badge-tight">UA Hub-to-Hub (1.45× Non-Rev Traffic)</span>`);
+    }
+    if (res.is_shared_regional_spoke) {
+      scopeBadges.push(`<span class="badge badge-null">Shared Regional CPA</span>`);
+    }
+    if (res.holiday_name) {
+      scopeBadges.push(`<span class="badge badge-low">${esc(res.holiday_name)} Window</span>`);
+    }
+
+    // ±3 day cards
+    const dayCardsHtml = res.neighbor_days
+      .map((nd) => {
+        const isSel = nd.flight_date === res.flight_date;
+        const pct = Math.round(nd.whole_day_prob * 100);
+        const col = probColor(nd.whole_day_prob);
+        const deltaPp = Math.round(nd.delta_vs_selected * 100);
+        const deltaLabel = isSel
+          ? "Selected"
+          : deltaPp === 0
+            ? "Same"
+            : `${deltaPp > 0 ? "+" : ""}${deltaPp}pp`;
+        const deltaColor = isSel
+          ? "var(--brand)"
+          : deltaPp > 0
+            ? "var(--soi-high)"
+            : deltaPp < 0
+              ? "var(--soi-low)"
+              : "var(--text-muted)";
+        const shortDate = nd.flight_date.slice(5); // MM-DD
+        return `
+          <button type="button" class="day-card ${isSel ? "selected" : ""}" data-pick-date="${esc(nd.flight_date)}" title="Switch travel date to ${esc(nd.flight_date)} (${esc(nd.day_of_week)})">
+            <div class="day-card-dow">${esc(nd.day_of_week)}</div>
+            <div class="day-card-date">${esc(shortDate)}</div>
+            <div class="day-card-prob" style="color:${col}">${pct}%</div>
+            <div class="day-card-bar"><span style="width:${pct}%;background:${col}"></span></div>
+            <div class="day-card-delta" style="color:${deltaColor}">${esc(deltaLabel)}</div>
+            ${nd.holiday_name ? `<div class="day-card-hol">${esc(nd.holiday_name)}</div>` : ""}
+          </button>
+        `;
+      })
+      .join("");
+
+    // Hour-block breakdown cards
+    const hbCardsHtml = res.hour_blocks
+      .map((hb) => {
+        const isBest = !res.is_international_v1 && res.best_hour_block === hb.label && hb.expected_flights >= 0.2;
+        const clearPct = Math.round(hb.clearance_prob * 100);
+        const seatPct = Math.round(hb.seat_avail_prob * 100);
+        const col = probColor(hb.clearance_prob);
+        return `
+          <div class="hb-card ${isBest ? "best" : ""}">
+            <div class="hb-card-top">
+              <div>
+                <div class="hb-card-title">${esc(hb.label)}</div>
+                ${isBest ? `<span class="badge badge-high" style="margin-top:3px">Best Departure Window</span>` : ""}
+              </div>
+              <div class="hb-card-prob" style="color:${col}">${clearPct}%</div>
+            </div>
+            <div class="hb-bar-track" title="Solid bar: clearance odds (${clearPct}%) · Light bar: seat-only odds (${seatPct}%)">
+              <div class="hb-bar-seat" style="width:${seatPct}%"></div>
+              <div class="hb-bar-clear" style="width:${clearPct}%;background:${col}"></div>
+            </div>
+            <div class="hb-meta-row">
+              <span><strong>${hb.expected_flights.toFixed(1)}</strong> flts/bank</span>
+              <span><strong>${hb.expected_open_seats.toFixed(1)}</strong> open seats</span>
+              <span>Canc: <strong>${(hb.cancel_rate * 100).toFixed(1)}%</strong></span>
+              <span>Seat-only: <strong>${seatPct}%</strong></span>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    root.innerHTML = `
+      <div class="pred-hero-grid">
+        <div class="panel">
+          <div class="pred-route-banner">
+            <div>
+              <span class="pred-route-code">ORD → ${esc(res.dest)}</span>
+              <span class="pred-route-city">${esc(res.dest_city)}, ${esc(res.dest_state_or_country)} · ${esc(res.flight_date)} (${esc(res.day_of_week)})</span>
+            </div>
+            <button id="pred-inspect-route" type="button" class="btn-ghost">Inspect Route History →</button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${scopeBadges.join("")}</div>
+
+          <div class="pred-gauge-wrap">
+            ${renderGaugeSvg(res.whole_day_prob, res.ci_low_80, res.ci_high_80, res.risk_tier)}
+            <div class="pred-transparency-strip">
+              <div class="pred-metric-tile">
+                <div class="m-label">With Queue Overlay (Party of ${res.party_size})</div>
+                <div class="m-val" style="color:${probColor(res.whole_day_prob)}">${(res.whole_day_prob * 100).toFixed(1)}%</div>
+                <div class="m-sub">~${res.estimated_queue_ahead.toFixed(1)} ahead · ${esc(res.queue_source)}</div>
+              </div>
+              <div class="pred-metric-tile">
+                <div class="m-label">Pure Open-Seat Odds (No Queue)</div>
+                <div class="m-val" style="color:var(--brand)">${(res.seat_only_whole_day_prob * 100).toFixed(1)}%</div>
+                <div class="m-sub">Empirically calibrated (walk-forward validated)</div>
+              </div>
+            </div>
+            <div class="pred-mini-stats">
+              <div class="pred-mini-stat">
+                <div class="s-lbl">Expected Flights / Day</div>
+                <div class="s-val">${res.expected_daily_flights.toFixed(1)}</div>
+              </div>
+              <div class="pred-mini-stat">
+                <div class="s-lbl">Avg Open Seats / Flight</div>
+                <div class="s-val">${res.expected_open_seats_avg.toFixed(1)}</div>
+              </div>
+              <div class="pred-mini-stat">
+                <div class="s-lbl">Expected Cancel Risk</div>
+                <div class="s-val">${(res.expected_cancel_rate * 100).toFixed(1)}%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head" style="margin-bottom:10px;">
+            <div>
+              <h3 class="panel-title">Key Forecast Drivers &amp; Strategy</h3>
+              <p class="panel-subtitle">Why ORD → ${esc(res.dest)} landed at <strong>${Math.round(res.whole_day_prob * 100)}%</strong> (${esc(res.risk_tier)})</p>
+            </div>
+            <span class="badge ${probBadgeClass(res.whole_day_prob)}">${esc(res.risk_tier)}</span>
+          </div>
+          <ul class="pred-drivers-list">
+            ${res.drivers.map((d) => `<li>${esc(d)}</li>`).join("")}
+          </ul>
+          <div class="caveat-box" style="margin-top:12px;">
+            <strong>Transparency Guardrail:</strong> ${esc(res.disclaimer)}
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3 class="panel-title">Flexible Dates Comparison (±3 Days Around ${esc(res.flight_date)})</h3>
+            <p class="panel-subtitle">Click any nearby date card to switch immediately and compare whole-day standby odds.</p>
+          </div>
+        </div>
+        <div class="pred-day-strip">${dayCardsHtml}</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <h3 class="panel-title">${res.is_international_v1 ? "International Route-Month Outlook (T-100 Prior v1)" : "Departure Window Breakdown (Chronological ORD Banks)"}</h3>
+            <p class="panel-subtitle">
+              ${res.is_international_v1
+                ? "BTS OTP covers US domestic flights only; international routes use BTS T-100 monthly load factors and daily frequency."
+                : "Solid bar = single-bank clearance odds (including earlier-bank cancellation spillover & queue); shaded background bar = pure seat-only availability."}
+            </p>
+          </div>
+        </div>
+        <div class="hb-grid ${res.is_international_v1 ? "single-col" : ""}">${hbCardsHtml}</div>
+      </div>
+    `;
+
+    // Bind clickable ±3 day cards
+    $$(".day-card[data-pick-date]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.pred.flight_date = btn.getAttribute("data-pick-date");
+        syncPredictorInputs();
+        renderPredictor();
+      });
+    });
+
+    // Bind Route History drawer link
+    const inspectBtn = $("#pred-inspect-route");
+    if (inspectBtn && DATA) {
+      inspectBtn.addEventListener("click", () => {
+        const match = DATA.routes.find((r) => r.dst === res.dest);
+        if (match) openRouteDrawer(match);
+      });
+    }
+  }
+
+  function syncTabChrome() {
+    const isPred = state.tab === "predictor";
+    const kpiEl = $("#kpi-grid");
+    const bannerEl = $("#context-banner");
+    if (kpiEl) kpiEl.classList.toggle("hidden", isPred);
+    if (bannerEl) bannerEl.classList.toggle("hidden", isPred);
   }
 
   // ---------------------------------------------------------------------------
@@ -1333,24 +1796,23 @@
   function openMethodologyDrawer() {
     openDrawer(
       "Methodology, Formula & Mandatory Disclaimers",
-      "United Standby Opportunity Explorer (ORD Hub · v1)",
+      "United Standby Opportunity Explorer & Day Predictor (ORD Hub · v1)",
       `
         <div class="eq-box">
           <div class="eq-row"><span><strong>SOI Formula (0–100 Heuristic)</strong></span><span class="mono">0.50·S_open + 0.20·S_disp + 0.20·S_backup + 0.10·S_demand</span></div>
-          <div class="eq-row"><span><strong>S_open (50%)</strong></span><span>50/50 blend of adjusted open seats (cap 25) &amp; open cabin % (cap 30%)</span></div>
-          <div class="eq-row"><span><strong>S_disp (20%)</strong></span><span>Exponentially decayed earlier ORD→DEST disruptions (hist) or prior-year rate × earlier scheduled flights (plan)</span></div>
-          <div class="eq-row"><span><strong>S_backup (20%)</strong></span><span>Logarithmic curve ln(1 + N_after)/ln(7) over strictly later same-day departures</span></div>
-          <div class="eq-row"><span><strong>S_demand (10%)</strong></span><span>Annual-relative national TSA throughput ratio + 6-window US holiday indicator</span></div>
+          <div class="eq-row"><span><strong>Day Predictor Engine</strong></span><span>4-tier Empirical Bayes priors + 2,000-draw correlated Monte Carlo (hub IRROPS + same-day demand + bank spillover)</span></div>
+          <div class="eq-row"><span><strong>Pass Priority Queue Overlay</strong></span><span>Transparent assumed competing standbys (SA1P 0.8 · SA2 2.5 · SA3 5.0 · Buddy 8.5), replaced 1:1 by EmployeeRES input</span></div>
+          <div class="eq-row"><span><strong>Walk-Forward Calibration</strong></span><span>Strictly out-of-sample (train.year &lt; eval.year) Brier, BSS, ECE, ROC-AUC on open-seat availability</span></div>
         </div>
 
-        <h3 style="font-size:13.5px;margin:16px 0 6px;">1. Non-Probability Heuristic Disclaimer</h3>
-        <p class="panel-subtitle" style="line-height:1.6"><code>soi_historical</code> and <code>soi_planning</code> are transparent 0–100 relative opportunity heuristics constructed strictly from public U.S. government aviation datasets (BTS OTP, BTS T-100, FAA Aircraft Registry, TSA daily checkpoint throughput) and curated cabin configurations. <strong>They are NOT a probability of boarding.</strong> No public dataset contains United Airlines gate standby lists, pass priorities (SA1P/SA2/buddy pass), hire-date seniority, revenue standby/SDC counts, or weight-and-balance payload limits.</p>
+        <h3 style="font-size:13.5px;margin:16px 0 6px;">1. Empirical Open-Seat Priors vs. Pass-Tier Queue Overlay</h3>
+        <p class="panel-subtitle" style="line-height:1.6"><code>soi_historical</code> and <code>soi_planning</code> are transparent 0–100 relative opportunity heuristics. The <strong>Trip Predictor</strong> separates empirically calibrated open-seat availability (<code>P(open_seats ≥ k)</code> validated on public BTS/FAA/TSA data) from the assumed pass-tier competing standby queue (which is NOT observed in public government data unless you supply live EmployeeRES counts). <strong>Neither is an official United Airlines boarding guarantee.</strong></p>
 
         <h3 style="font-size:13.5px;margin:14px 0 6px;">2. Modeled Intraday &amp; Day-of-Week Adjustments</h3>
         <p class="panel-subtitle" style="line-height:1.6">BTS T-100 reports passenger loads strictly at the monthly <code>carrier × route × aircraft_type</code> grain. All hour-of-day and day-of-week differences come from BTS OTP operational signals (schedules, delays, cancellations, same-day backup banks) and damped TSA / hour-block multipliers (<code>alpha = 0.35</code>, clipped <code>[0.80, 1.20]</code>), <strong>not</strong> observed flight-level passenger loads.</p>
 
         <h3 style="font-size:13.5px;margin:14px 0 6px;">3. International Scope (v1) &amp; Shared Regional CPA</h3>
-        <p class="panel-subtitle" style="line-height:1.6">BTS OTP covers U.S. domestic flights only; international ORD departures (71 stations, 2,300 route-months) are analyzed strictly at the <code>route × month × carrier</code> grain (<code>route_month_only_v1</code>). On shared multi-brand regional spokes, OO (SkyWest), YX (Republic), and 2023 ZW (Air Wisconsin) T-100 loads reflect combined UA/AA/DL operations.</p>
+        <p class="panel-subtitle" style="line-height:1.6">BTS OTP covers U.S. domestic flights only; international ORD departures (71 stations, 2,300 route-months) are modeled strictly at the <code>route × month × carrier</code> grain (<code>route_month_only_v1</code>). On shared multi-brand regional spokes, OO (SkyWest), YX (Republic), and 2023 ZW (Air Wisconsin) T-100 loads reflect combined UA/AA/DL operations.</p>
 
         <h3 style="font-size:13.5px;margin:14px 0 6px;">4. Independent Portfolio Project</h3>
         <p class="panel-subtitle" style="line-height:1.6">This analytics engineering project is independent and is <strong>not affiliated with, endorsed by, or sponsored by United Airlines, Inc.</strong> or its United Express partners.</p>
@@ -1362,6 +1824,9 @@
   // 8. FULL RENDER & EVENT BINDINGS
   // ---------------------------------------------------------------------------
   function renderAll() {
+    syncTabChrome();
+    renderPredictor();
+    if (!DATA) return;
     renderContextBanner();
     renderKpis();
     renderRouteMap();
@@ -1403,6 +1868,7 @@
       document.documentElement.setAttribute("data-theme", next);
       $("#theme-label").textContent = next === "dark" ? "Light" : "Dark";
       renderHeatmapAndSubscores();
+      renderPredictor();
     });
 
     // Tabs
@@ -1416,8 +1882,185 @@
           b.setAttribute("aria-selected", String(active));
         });
         $$(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === `panel-${t}`));
+        syncTabChrome();
       });
     });
+
+    // Trip Predictor controls
+    const destIn = $("#pred-dest-input");
+    if (destIn) {
+      const handleDestChange = () => {
+        const resolved = resolveTypedDest(destIn.value);
+        if (resolved) {
+          state.pred.dest = resolved;
+          syncPredictorInputs();
+          renderPredictor();
+        }
+      };
+      destIn.addEventListener("change", handleDestChange);
+      destIn.addEventListener("input", () => {
+        const val = destIn.value.trim().toUpperCase();
+        if (val.length === 3 && PRIORS && PRIORS.routes[val]) {
+          state.pred.dest = val;
+          syncPredictorInputs();
+          renderPredictor();
+        }
+      });
+    }
+
+    $$(".pred-quick-dests .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.pred.dest = btn.getAttribute("data-dest");
+        syncPredictorInputs();
+        renderPredictor();
+      });
+    });
+
+    const dateIn = $("#pred-date");
+    if (dateIn) {
+      dateIn.addEventListener("change", (e) => {
+        if (e.target.value) {
+          state.pred.flight_date = e.target.value;
+          renderPredictor();
+        }
+      });
+    }
+
+    $$("[data-party]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        state.pred.party_size = Number(btn.getAttribute("data-party"));
+        syncPredictorInputs();
+        renderPredictor();
+      });
+    });
+
+    const prioSel = $("#pred-priority");
+    if (prioSel) {
+      prioSel.addEventListener("change", (e) => {
+        state.pred.priority = e.target.value;
+        renderPredictor();
+      });
+    }
+
+    const predCgSel = $("#pred-carrier");
+    if (predCgSel) {
+      predCgSel.addEventListener("change", (e) => {
+        state.pred.carrier_group = e.target.value;
+        renderPredictor();
+      });
+    }
+
+    const openOv = $("#pred-open-override");
+    if (openOv) {
+      openOv.addEventListener("input", (e) => {
+        state.pred.open_seats_override = e.target.value;
+        renderPredictor();
+      });
+    }
+
+    const qOv = $("#pred-queue-override");
+    if (qOv) {
+      qOv.addEventListener("input", (e) => {
+        state.pred.standbys_ahead_override = e.target.value;
+        renderPredictor();
+      });
+    }
+
+    const horSel = $("#pred-horizon");
+    if (horSel) {
+      horSel.addEventListener("change", (e) => {
+        state.pred.hours_until_departure = Number(e.target.value);
+        renderPredictor();
+      });
+    }
+
+    const hbOv = $("#pred-target-hb");
+    if (hbOv) {
+      hbOv.addEventListener("change", (e) => {
+        state.pred.target_hour_block = e.target.value;
+        renderPredictor();
+      });
+    }
+
+    const resetLive = $("#pred-reset-live");
+    if (resetLive) {
+      resetLive.addEventListener("click", () => {
+        state.pred.open_seats_override = "";
+        state.pred.standbys_ahead_override = "";
+        state.pred.target_hour_block = "";
+        syncPredictorInputs();
+        renderPredictor();
+      });
+    }
+
+    // Quick Scenario Presets
+    $$(".pred-preset-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const preset = btn.getAttribute("data-preset");
+        const detailsEl = $("#pred-live-details");
+        if (preset === "den-offpeak") {
+          Object.assign(state.pred, {
+            dest: "DEN",
+            flight_date: "2027-01-19",
+            party_size: 1,
+            priority: "SA2",
+            carrier_group: "ALL",
+            open_seats_override: "",
+            standbys_ahead_override: "",
+            target_hour_block: "",
+          });
+          if (detailsEl) detailsEl.open = false;
+        } else if (preset === "den-tg") {
+          Object.assign(state.pred, {
+            dest: "DEN",
+            flight_date: "2026-11-29",
+            party_size: 2,
+            priority: "BUDDY",
+            carrier_group: "ALL",
+            open_seats_override: "",
+            standbys_ahead_override: "",
+            target_hour_block: "",
+          });
+          if (detailsEl) detailsEl.open = false;
+        } else if (preset === "ewr-live") {
+          Object.assign(state.pred, {
+            dest: "EWR",
+            flight_date: "2026-12-18",
+            party_size: 1,
+            priority: "SA2",
+            carrier_group: "ALL",
+            open_seats_override: "6",
+            standbys_ahead_override: "4",
+            hours_until_departure: 3,
+            target_hour_block: "evening",
+          });
+          if (detailsEl) detailsEl.open = true;
+        } else if (preset === "cun-intl") {
+          Object.assign(state.pred, {
+            dest: "CUN",
+            flight_date: "2026-07-18",
+            party_size: 2,
+            priority: "SA3",
+            carrier_group: "ALL",
+            open_seats_override: "",
+            standbys_ahead_override: "",
+            target_hour_block: "",
+          });
+          if (detailsEl) detailsEl.open = false;
+        }
+        syncPredictorInputs();
+        renderPredictor();
+      });
+    });
+
+    // Calibration threshold select (Tab 6)
+    const calSel = $("#cal-threshold-select");
+    if (calSel) {
+      calSel.addEventListener("change", (e) => {
+        state.calThreshold = e.target.value;
+        renderCalibrationPanel();
+      });
+    }
 
     // Map controls
     $$("[data-map-view]").forEach((btn) => {
@@ -1476,16 +2119,30 @@
 
   async function init() {
     bindEvents();
+    syncTabChrome();
     try {
-      if (window.__DASHBOARD_DATA__) {
-        DATA = window.__DASHBOARD_DATA__;
-      } else {
-        const res = await fetch("data/dashboard_data.json");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        DATA = await res.json();
-      }
+      const dataPromise = window.__DASHBOARD_DATA__
+        ? Promise.resolve(window.__DASHBOARD_DATA__)
+        : fetch("data/dashboard_data.json").then((res) => {
+            if (!res.ok) throw new Error(`dashboard_data HTTP ${res.status}`);
+            return res.json();
+          });
+      const priorsPromise = window.__PREDICTOR_PRIORS__
+        ? Promise.resolve(window.__PREDICTOR_PRIORS__)
+        : fetch("data/predictor_priors.json").then((res) => {
+            if (!res.ok) throw new Error(`predictor_priors HTTP ${res.status}`);
+            return res.json();
+          });
+
+      const [dashData, priorsData] = await Promise.all([dataPromise, priorsPromise]);
+      DATA = dashData;
+      PRIORS = priorsData;
+      populatePredictorDatalist();
+      syncPredictorInputs();
       renderAll();
     } catch (err) {
+      const msg = `<div class="panel">Failed to load dashboard data: ${esc(err.message)}</div>`;
+      if ($("#pred-results-root")) $("#pred-results-root").innerHTML = msg;
       $("#kpi-grid").innerHTML = `<div class="kpi-card" style="grid-column:1/-1">Failed to load dashboard data: ${esc(err.message)}</div>`;
     }
   }

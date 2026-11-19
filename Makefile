@@ -47,7 +47,7 @@ export-looker:
 	$(PYTHON) -m standby export-looker --hub ORD --years 2019,2023-2026
 
 build-dashboard:
-	python3 scripts/build_dashboard_data.py
+	$(PYTHON) scripts/build_dashboard_data.py
 
 dbt-parse:
 	$(DBT) parse --project-dir dbt --profiles-dir dbt --no-send-anonymous-usage-stats --no-populate-cache
