@@ -28,3 +28,8 @@ models:
     columns:
       - name: route_id
         data_tests: [unique, not_null]
+  - name: lk_predictor_priors
+    description: "Empirical seat-availability priors behind the Trip Predictor (agg_predictor_priors) with labels and destination geo, for the Looker Studio Predictor page."
+    columns:
+      - name: prior_id
+        data_tests: [unique, not_null]
